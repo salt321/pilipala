@@ -35,12 +35,12 @@ void main() {
     expect(virtualList.cacheExtent, 208);
     expect(delegate.addAutomaticKeepAlives, isFalse);
 
-    await tester.tap(find.byTooltip('自动播放时继承历史进度'));
+    await tester.tap(find.byTooltip('切换视频时继承历史进度'));
     await tester.pump();
 
     expect(progressToggleCount, 1);
     expect(find.byIcon(Icons.restart_alt), findsOneWidget);
-    expect(find.byTooltip('自动播放时从头播放'), findsOneWidget);
+    expect(find.byTooltip('切换视频时从头播放'), findsOneWidget);
 
     await tester.tap(find.byTooltip('解锁并使用视频原始列表'));
     await tester.pump();

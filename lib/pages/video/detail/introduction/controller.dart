@@ -414,9 +414,8 @@ class VideoIntroController extends GetxController {
     String bvid,
     int cid,
     int? aid,
-    String? cover, {
-    bool autoAdvance = false,
-  }) async {
+    String? cover,
+  ) async {
     // 重新获取视频资源
     final VideoDetailController videoDetailCtr =
         Get.find<VideoDetailController>(tag: heroTag);
@@ -435,8 +434,7 @@ class VideoIntroController extends GetxController {
       ..activePlaylistBvid.value = bvid
       ..cover.value = cover ?? ''
       ..queryVideoUrl(
-        resumeHistoryProgress:
-            !autoAdvance || videoDetailCtr.resumePlaylistProgress.value,
+        resumeHistoryProgress: videoDetailCtr.resumePlaylistProgress.value,
       )
       ..clearSubtitleContent();
     await videoDetailCtr.getSubtitle();
@@ -488,9 +486,8 @@ class VideoIntroController extends GetxController {
 
   /// 播放相邻的视频或分 P
   Future<void> playAdjacent(
-    int offset, {
-    bool autoAdvance = false,
-  }) async {
+    int offset,
+  ) async {
     late final List episodes;
     bool isPages = false;
     bool isCustomPlaylist = false;
@@ -564,13 +561,11 @@ class VideoIntroController extends GetxController {
       cid,
       rAid,
       cover,
-      autoAdvance: autoAdvance,
     );
   }
 
   /// 列表循环或者顺序播放时，播放下一个
-  Future<void> nextPlay({bool autoAdvance = true}) =>
-      playAdjacent(1, autoAdvance: autoAdvance);
+  Future<void> nextPlay() => playAdjacent(1);
 
   // 设置关注分组
   void setFollowGroup() {

@@ -121,7 +121,7 @@ class _MediaListPanelState extends State<MediaListPanel> {
             ),
             actions: [
               IconButton(
-                tooltip: _resumeProgress ? '自动播放时继承历史进度' : '自动播放时从头播放',
+                tooltip: _resumeProgress ? '切换视频时继承历史进度' : '切换视频时从头播放',
                 icon: Icon(
                   _resumeProgress ? Icons.history : Icons.restart_alt,
                   size: 20,

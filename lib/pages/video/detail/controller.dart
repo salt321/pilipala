@@ -352,7 +352,9 @@ class VideoDetailController extends GetxController
         archiveSourceType.value = 'durl';
         videoUrl = data.durl!.first.url!;
         audioUrl = '';
-        defaultST = Duration.zero;
+        defaultST = resumeHistoryProgress
+            ? Duration(milliseconds: data.lastPlayTime!)
+            : Duration.zero;
         firstVideo = VideoItem();
         currentVideoQa = VideoQualityCode.fromCode(data.quality!)!;
         if (autoPlay.value) {
@@ -670,7 +672,7 @@ class VideoDetailController extends GetxController
   void togglePlaylistProgressResume() {
     resumePlaylistProgress.toggle();
     SmartDialog.showToast(
-      resumePlaylistProgress.value ? '自动播放将继承历史进度' : '自动播放将从头开始',
+      resumePlaylistProgress.value ? '切换视频将继承历史进度' : '切换视频将从头开始',
     );
   }
 
@@ -685,7 +687,9 @@ class VideoDetailController extends GetxController
     cid.value = cidVal;
     danmakuCid.value = cidVal;
     cover.value = coverVal;
-    queryVideoUrl();
+    queryVideoUrl(
+      resumeHistoryProgress: resumePlaylistProgress.value,
+    );
     clearSubtitleContent();
     await getSubtitle();
     setSubtitleContent();

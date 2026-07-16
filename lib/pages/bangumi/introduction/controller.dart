@@ -224,7 +224,9 @@ class BangumiIntroController extends GetxController {
     videoDetailCtr.danmakuCid.value = cid;
     videoDetailCtr.oid.value = aid;
     videoDetailCtr.cover.value = cover;
-    videoDetailCtr.queryVideoUrl();
+    videoDetailCtr.queryVideoUrl(
+      resumeHistoryProgress: videoDetailCtr.resumePlaylistProgress.value,
+    );
     videoDetailCtr.getSubtitle();
     videoDetailCtr.setSubtitleContent();
     // 重新请求评论

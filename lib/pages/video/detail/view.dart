@@ -537,7 +537,7 @@ class _VideoDetailPageState extends State<VideoDetailPage>
               onNext: () {
                 if (vdCtr.lockMediaPlaylist.value ||
                     vdCtr.videoType == SearchType.video) {
-                  videoIntroController.nextPlay(autoAdvance: false);
+                  videoIntroController.nextPlay();
                 } else if (vdCtr.videoType == SearchType.media_bangumi) {
                   bangumiIntroController.nextPlay();
                 }
