@@ -143,12 +143,11 @@ class _VideoDetailPageState extends State<VideoDetailPage>
       shutdownTimerService.handleWaitingFinished();
 
       /// 顺序播放 列表循环
-      if (plPlayerController!.playRepeat != PlayRepeat.pause &&
-          plPlayerController!.playRepeat != PlayRepeat.singleCycle) {
-        if (vdCtr.videoType == SearchType.video) {
+      if (vdCtr.shouldAutoAdvance) {
+        if (vdCtr.lockMediaPlaylist.value ||
+            vdCtr.videoType == SearchType.video) {
           videoIntroController.nextPlay();
-        }
-        if (vdCtr.videoType == SearchType.media_bangumi) {
+        } else if (vdCtr.videoType == SearchType.media_bangumi) {
           bangumiIntroController.nextPlay();
         }
       }

@@ -6,6 +6,7 @@ import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
 import 'package:hive/hive.dart';
 import 'package:pilipala/http/constants.dart';
+import 'package:pilipala/http/search.dart';
 import 'package:pilipala/http/user.dart';
 import 'package:pilipala/http/video.dart';
 import 'package:pilipala/models/user/fav_folder.dart';
@@ -48,10 +49,8 @@ class VideoIntroController extends GetxController {
   List delMediaIdsNew = [];
   // 关注状态 默认未关注
   RxMap followStatus = {}.obs;
-  int _tempThemeValue = -1;
-
   RxInt lastPlayCid = 0.obs;
-  var userInfo;
+  dynamic userInfo;
 
   // 同时观看
   bool isShowOnlineTotal = false;
@@ -480,7 +479,7 @@ class VideoIntroController extends GetxController {
   }
 
   /// 列表循环或者顺序播放时，自动播放下一个
-  void nextPlay() {
+  Future<void> nextPlay() async {
     final List episodes = [];
     bool isPages = false;
     late String cover;
@@ -488,7 +487,7 @@ class VideoIntroController extends GetxController {
         Get.find<VideoDetailController>(tag: heroTag);
 
     /// 优先稍后再看、收藏夹
-    if (videoDetailCtr.isWatchLaterVisible.value) {
+    if (videoDetailCtr.lockMediaPlaylist.value) {
       episodes.addAll(videoDetailCtr.mediaList);
     } else if (videoDetail.value.ugcSeason != null) {
       final UgcSeason ugcSeason = videoDetail.value.ugcSeason!;
@@ -503,18 +502,11 @@ class VideoIntroController extends GetxController {
       episodes.addAll(pages);
     }
 
+    if (episodes.isEmpty) return;
     final int currentIndex =
         episodes.indexWhere((e) => e.cid == lastPlayCid.value);
-    int nextIndex = currentIndex + 1;
-    cover = episodes[nextIndex].cover;
+    int nextIndex = currentIndex < 0 ? 0 : currentIndex + 1;
     final PlayRepeat platRepeat = videoDetailCtr.plPlayerController.playRepeat;
-
-    int cid = episodes[nextIndex].cid!;
-    while (cid == -1) {
-      nextIndex += 1;
-      SmartDialog.showToast('当前视频暂不支持播放，自动跳过');
-      cid = episodes[nextIndex].cid!;
-    }
 
     // 列表循环
     if (nextIndex >= episodes.length) {
@@ -525,8 +517,26 @@ class VideoIntroController extends GetxController {
         return;
       }
     }
-    final String rBvid = isPages ? bvid : episodes[nextIndex].bvid;
-    final int rAid = isPages ? IdUtils.bv2av(bvid) : episodes[nextIndex].aid!;
+    if (nextIndex >= episodes.length) return;
+
+    final nextItem = episodes[nextIndex];
+    int cid = nextItem.cid ?? -1;
+    if (cid <= 0 && !isPages) {
+      try {
+        cid = await SearchHttp.ab2c(
+          aid: nextItem.aid ?? nextItem.id,
+          bvid: nextItem.bvid,
+        );
+        nextItem.cid = cid;
+      } catch (_) {
+        SmartDialog.showToast('下一个视频缺少播放信息');
+        return;
+      }
+    }
+    cover = nextItem.cover ?? '';
+    final String rBvid = isPages ? bvid : nextItem.bvid;
+    final int rAid =
+        isPages ? IdUtils.bv2av(bvid) : (nextItem.aid ?? nextItem.id);
     changeSeasonOrbangu(rBvid, cid, rAid, cover);
   }
 

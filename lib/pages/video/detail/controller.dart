@@ -25,6 +25,7 @@ import 'package:screen_brightness/screen_brightness.dart';
 import '../../../models/video/subTitile/content.dart';
 import '../../../http/danmaku.dart';
 import '../../../plugin/pl_player/models/bottom_control_type.dart';
+import '../../../plugin/pl_player/models/play_repeat.dart';
 import '../../../utils/id_utils.dart';
 import 'introduction/controller.dart';
 import 'reply/controller.dart';
@@ -91,7 +92,7 @@ class VideoDetailController extends GetxController
   double? brightness;
   // 默认记录历史记录
   bool enableHeart = true;
-  var userInfo;
+  dynamic userInfo;
   late bool isFirstTime = true;
   Floating? floating;
   late PreferredSizeWidget headerControl;
@@ -118,7 +119,13 @@ class VideoDetailController extends GetxController
   ScrollController? replyScrollController;
   List<MediaVideoItemModel> mediaList = <MediaVideoItemModel>[];
   RxBool isWatchLaterVisible = false.obs;
+  RxBool lockMediaPlaylist = false.obs;
   RxString watchLaterTitle = ''.obs;
+
+  bool get shouldAutoAdvance =>
+      plPlayerController.playRepeat != PlayRepeat.singleCycle &&
+      (lockMediaPlaylist.value ||
+          plPlayerController.playRepeat != PlayRepeat.pause);
 
   @override
   void onInit() {
@@ -171,13 +178,19 @@ class VideoDetailController extends GetxController
     sourceType.value = argMap['sourceType'] ?? 'normal';
     isWatchLaterVisible.value =
         sourceType.value == 'watchLater' || sourceType.value == 'fav';
+    lockMediaPlaylist.value = isWatchLaterVisible.value;
     if (sourceType.value == 'watchLater') {
       watchLaterTitle.value = '稍后再看';
       fetchMediaList();
     }
     if (sourceType.value == 'fav') {
       watchLaterTitle.value = argMap['favTitle'];
-      queryFavVideoList();
+      final suppliedList = argMap['mediaList'];
+      if (suppliedList is List<MediaVideoItemModel>) {
+        mediaList = List.of(suppliedList);
+      } else {
+        queryFavVideoList();
+      }
     }
     tabCtr.addListener(() {
       onTabChanged();
@@ -448,7 +461,7 @@ class VideoDetailController extends GetxController
   hiddenReplyReplyPanel() {
     replyReplyBottomSheetCtr != null
         ? replyReplyBottomSheetCtr!.close()
-        : print('replyReplyBottomSheetCtr is null');
+        : debugPrint('replyReplyBottomSheetCtr is null');
   }
 
   // 获取字幕配置
@@ -618,11 +631,20 @@ class VideoDetailController extends GetxController
         bvid: bvid,
         mediaId: Get.arguments['mediaId'],
         hasMore: mediaList.length != Get.arguments['count'],
+        playlistLocked: lockMediaPlaylist.value,
+        onPlaylistLockChanged: toggleMediaPlaylistLock,
       );
     });
     replyReplyBottomSheetCtr?.closed.then((value) {
       isWatchLaterVisible.value = true;
     });
+  }
+
+  void toggleMediaPlaylistLock() {
+    lockMediaPlaylist.toggle();
+    SmartDialog.showToast(
+      lockMediaPlaylist.value ? '已锁定当前播放队列' : '已切换到视频原始列表',
+    );
   }
 
   // 切换稍后再看

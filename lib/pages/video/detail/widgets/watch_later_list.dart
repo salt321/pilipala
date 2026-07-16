@@ -21,6 +21,8 @@ class MediaListPanel extends StatefulWidget {
     this.bvid,
     this.mediaId,
     this.hasMore = false,
+    this.playlistLocked = true,
+    this.onPlaylistLockChanged,
     super.key,
   });
 
@@ -31,6 +33,8 @@ class MediaListPanel extends StatefulWidget {
   final String? bvid;
   final int? mediaId;
   final bool hasMore;
+  final bool playlistLocked;
+  final VoidCallback? onPlaylistLockChanged;
 
   @override
   State<MediaListPanel> createState() => _MediaListPanelState();
@@ -39,10 +43,12 @@ class MediaListPanel extends StatefulWidget {
 class _MediaListPanelState extends State<MediaListPanel> {
   RxList<MediaVideoItemModel> mediaList = <MediaVideoItemModel>[].obs;
   final ScrollController _scrollController = ScrollController();
+  late bool _playlistLocked;
 
   @override
   void initState() {
     super.initState();
+    _playlistLocked = widget.playlistLocked;
     mediaList.value = widget.mediaList;
     _scrollController.addListener(() {
       if (_scrollController.position.pixels >=
@@ -74,6 +80,12 @@ class _MediaListPanelState extends State<MediaListPanel> {
   }
 
   @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Container(
       height: widget.sheetHeight,
@@ -84,11 +96,31 @@ class _MediaListPanelState extends State<MediaListPanel> {
             toolbarHeight: 45,
             automaticallyImplyLeading: false,
             centerTitle: false,
-            title: Text(
-              widget.panelTitle ?? '稍后再看',
-              style: Theme.of(context).textTheme.titleSmall,
+            title: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.panelTitle ?? '稍后再看',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                Text(
+                  _playlistLocked ? '自动播放：当前队列' : '自动播放：视频原始列表',
+                  style: Theme.of(context).textTheme.labelSmall,
+                ),
+              ],
             ),
             actions: [
+              IconButton(
+                tooltip: _playlistLocked ? '解锁并使用视频原始列表' : '锁定当前播放队列',
+                icon: Icon(
+                  _playlistLocked ? Icons.lock : Icons.lock_open,
+                  size: 20,
+                ),
+                onPressed: () {
+                  setState(() => _playlistLocked = !_playlistLocked);
+                  widget.onPlaylistLockChanged?.call();
+                },
+              ),
               IconButton(
                 icon: const Icon(Icons.close, size: 20),
                 onPressed: () {

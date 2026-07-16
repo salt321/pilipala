@@ -127,7 +127,8 @@ class _FavDetailPageState extends State<FavDetailPage> {
                 decoration: BoxDecoration(
                   border: Border(
                     bottom: BorderSide(
-                      color: Theme.of(context).dividerColor.withOpacity(0.2),
+                      color:
+                          Theme.of(context).dividerColor.withValues(alpha: 0.2),
                     ),
                   ),
                 ),
@@ -268,8 +269,8 @@ class _FavDetailPageState extends State<FavDetailPage> {
         () => _favDetailController.mediaCount > 0
             ? FloatingActionButton.extended(
                 onPressed: _favDetailController.toViewPlayAll,
-                label: const Text('播放全部'),
-                icon: const Icon(Icons.playlist_play),
+                label: const Text('整理并播放'),
+                icon: const Icon(Icons.playlist_add_check),
               )
             : const SizedBox(),
       ),
