@@ -483,8 +483,14 @@ class VideoIntroController extends GetxController {
     super.onClose();
   }
 
-  /// 列表循环或者顺序播放时，自动播放下一个
-  Future<void> nextPlay() async {
+  /// 手动播放上一个视频或分 P
+  Future<void> previousPlay() => playAdjacent(-1);
+
+  /// 播放相邻的视频或分 P
+  Future<void> playAdjacent(
+    int offset, {
+    bool autoAdvance = false,
+  }) async {
     late final List episodes;
     bool isPages = false;
     bool isCustomPlaylist = false;
@@ -520,19 +526,16 @@ class VideoIntroController extends GetxController {
     if (currentIndex < 0 || currentIndex >= episodes.length) {
       currentIndex = episodes.indexWhere((e) => e.cid == lastPlayCid.value);
     }
-    int nextIndex = currentIndex < 0 ? 0 : currentIndex + 1;
+    int nextIndex = currentIndex < 0 ? 0 : currentIndex + offset;
     final PlayRepeat platRepeat = videoDetailCtr.plPlayerController.playRepeat;
 
-    // 列表循环
-    if (nextIndex >= episodes.length) {
+    if (nextIndex < 0 || nextIndex >= episodes.length) {
       if (platRepeat == PlayRepeat.listCycle) {
-        nextIndex = 0;
-      }
-      if (platRepeat == PlayRepeat.listOrder) {
+        nextIndex = nextIndex < 0 ? episodes.length - 1 : 0;
+      } else {
         return;
       }
     }
-    if (nextIndex >= episodes.length) return;
 
     if (isCustomPlaylist) {
       videoDetailCtr.activePlaylistIndex.value = nextIndex;
@@ -548,7 +551,7 @@ class VideoIntroController extends GetxController {
         );
         nextItem.cid = cid;
       } catch (_) {
-        SmartDialog.showToast('下一个视频缺少播放信息');
+        SmartDialog.showToast('相邻视频缺少播放信息');
         return;
       }
     }
@@ -561,9 +564,13 @@ class VideoIntroController extends GetxController {
       cid,
       rAid,
       cover,
-      autoAdvance: true,
+      autoAdvance: autoAdvance,
     );
   }
+
+  /// 列表循环或者顺序播放时，播放下一个
+  Future<void> nextPlay({bool autoAdvance = true}) =>
+      playAdjacent(1, autoAdvance: autoAdvance);
 
   // 设置关注分组
   void setFollowGroup() {

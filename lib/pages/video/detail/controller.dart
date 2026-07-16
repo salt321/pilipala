@@ -108,7 +108,9 @@ class VideoDetailController extends GetxController
   late bool enableRelatedVideo;
   List subtitles = [];
   RxList<BottomControlType> bottomList = [
+    BottomControlType.pre,
     BottomControlType.playOrPause,
+    BottomControlType.next,
     BottomControlType.time,
     BottomControlType.space,
     BottomControlType.fit,

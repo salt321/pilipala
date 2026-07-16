@@ -40,6 +40,8 @@ class PLVideoPlayer extends StatefulWidget {
     this.customWidget,
     this.customWidgets,
     this.showEposideCb,
+    this.onPrevious,
+    this.onNext,
     this.fullScreenCb,
     this.alignment = Alignment.center,
     super.key,
@@ -55,6 +57,8 @@ class PLVideoPlayer extends StatefulWidget {
   final Widget? customWidget;
   final List<Widget>? customWidgets;
   final Function? showEposideCb;
+  final VoidCallback? onPrevious;
+  final VoidCallback? onNext;
   final Function? fullScreenCb;
   final Alignment? alignment;
 
@@ -226,7 +230,7 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
           size: 21,
           color: Colors.white,
         ),
-        fuc: () {},
+        fuc: widget.onPrevious,
       ),
 
       /// 播放暂停
@@ -241,7 +245,7 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
           size: 21,
           color: Colors.white,
         ),
-        fuc: () {},
+        fuc: widget.onNext,
       ),
 
       /// 时间进度

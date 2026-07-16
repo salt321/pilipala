@@ -526,6 +526,22 @@ class _VideoDetailPageState extends State<VideoDetailPage>
                 playerController: plPlayerController!,
               ),
               bottomList: vdCtr.bottomList,
+              onPrevious: () {
+                if (vdCtr.lockMediaPlaylist.value ||
+                    vdCtr.videoType == SearchType.video) {
+                  videoIntroController.previousPlay();
+                } else if (vdCtr.videoType == SearchType.media_bangumi) {
+                  bangumiIntroController.previousPlay();
+                }
+              },
+              onNext: () {
+                if (vdCtr.lockMediaPlaylist.value ||
+                    vdCtr.videoType == SearchType.video) {
+                  videoIntroController.nextPlay(autoAdvance: false);
+                } else if (vdCtr.videoType == SearchType.media_bangumi) {
+                  bangumiIntroController.nextPlay();
+                }
+              },
               showEposideCb: () => vdCtr.videoType == SearchType.video
                   ? videoIntroController.showEposideHandler()
                   : bangumiIntroController.showEposideHandler(),
