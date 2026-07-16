@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:developer';
 
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:html/parser.dart';
@@ -52,25 +51,32 @@ class UserHttp {
     required int ps,
     required int mid,
   }) async {
-    var res = await Request().get(Api.userFavFolder, data: {
-      'pn': pn,
-      'ps': ps,
-      'up_mid': mid,
-    });
-    if (res.data['code'] == 0) {
-      late FavFolderData data;
-      if (res.data['data'] != null) {
-        data = FavFolderData.fromJson(res.data['data']);
+    try {
+      var res = await Request().get(Api.userFavFolder, data: {
+        'pn': pn,
+        'ps': ps,
+        'up_mid': mid,
+      });
+      final body = res.data;
+      if (body is Map && body['code'] == 0) {
+        final rawData = body['data'];
+        final data = rawData is Map
+            ? FavFolderData.fromJson(Map<String, dynamic>.from(rawData))
+            : FavFolderData.fromJson(const <String, dynamic>{});
         return {'status': true, 'data': data};
-      } else {
-        return {'status': false, 'msg': '收藏夹为空'};
       }
-    } else {
       return {
         'status': false,
         'data': [],
-        'msg': res.data['message'],
-        'code': res.data['code'],
+        'msg': '收藏请求失败\nAPI code: ${body is Map ? body['code'] : '未知'}\n'
+            '信息: ${body is Map ? body['message'] : body}',
+        'code': body is Map ? body['code'] : null,
+      };
+    } catch (error) {
+      return {
+        'status': false,
+        'data': [],
+        'msg': '收藏数据处理异常\n${error.runtimeType}: $error',
       };
     }
   }

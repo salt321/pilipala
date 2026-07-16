@@ -14,7 +14,7 @@ class MemberSeasonsPanel extends StatelessWidget {
     return ListView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      itemCount: data!.seasonsList!.length,
+      itemCount: data?.seasonsList?.length ?? 0,
       itemBuilder: (context, index) {
         MemberSeasonsList item = data!.seasonsList![index];
         return Padding(
@@ -25,29 +25,34 @@ class MemberSeasonsPanel extends StatelessWidget {
             children: [
               ListTile(
                 onTap: () {
-                  final int category = item.meta!.category!;
+                  final meta = item.meta;
+                  if (meta == null || meta.mid == null) return;
+                  final int category = meta.category ?? 0;
                   Map<String, String> parameters = {};
-                  if (category == 0) {
+                  if (category == 0 && meta.seasonId != null) {
                     parameters = {
                       'category': '0',
-                      'mid': item.meta!.mid.toString(),
-                      'seasonId': item.meta!.seasonId.toString(),
-                      'seasonName': item.meta!.name!,
+                      'mid': meta.mid.toString(),
+                      'seasonId': meta.seasonId.toString(),
+                      'seasonName': meta.name ?? '合集',
                     };
                   }
                   // 2为直播回放
-                  if (category == 1 || category == 2) {
+                  if ((category == 1 || category == 2) &&
+                      meta.seriesId != null) {
                     parameters = {
                       'category': '1',
-                      'mid': item.meta!.mid.toString(),
-                      'seriesId': item.meta!.seriesId.toString(),
-                      'seasonName': item.meta!.name!,
+                      'mid': meta.mid.toString(),
+                      'seriesId': meta.seriesId.toString(),
+                      'seasonName': meta.name ?? '系列',
                     };
                   }
-                  Get.toNamed('/memberSeasons', parameters: parameters);
+                  if (parameters.isNotEmpty) {
+                    Get.toNamed('/memberSeasons', parameters: parameters);
+                  }
                 },
                 title: Text(
-                  item.meta!.name!,
+                  item.meta?.name ?? '未命名合集',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.titleSmall!,
@@ -56,7 +61,7 @@ class MemberSeasonsPanel extends StatelessWidget {
                 leading: PBadge(
                   stack: 'relative',
                   size: 'small',
-                  text: item.meta!.total.toString(),
+                  text: (item.meta?.total ?? 0).toString(),
                 ),
                 trailing: const Icon(
                   Icons.arrow_forward,
@@ -81,7 +86,7 @@ class MemberSeasonsPanel extends StatelessWidget {
                       ),
                       physics: const NeverScrollableScrollPhysics(),
                       shrinkWrap: true,
-                      itemCount: item.archives!.length,
+                      itemCount: item.archives?.length ?? 0,
                       itemBuilder: (context, i) {
                         return MemberSeasonsItem(seasonItem: item.archives![i]);
                       },

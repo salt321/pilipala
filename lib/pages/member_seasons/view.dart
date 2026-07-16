@@ -2,6 +2,8 @@ import 'package:easy_debounce/easy_throttle.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:pilipala/common/constants.dart';
+import 'package:pilipala/common/widgets/http_error.dart';
+import 'package:pilipala/common/widgets/no_data.dart';
 import 'controller.dart';
 import 'widgets/item.dart';
 
@@ -13,8 +15,7 @@ class MemberSeasonsPage extends StatefulWidget {
 }
 
 class _MemberSeasonsPageState extends State<MemberSeasonsPage> {
-  final MemberSeasonsController _memberSeasonsController =
-      Get.put(MemberSeasonsController());
+  late MemberSeasonsController _memberSeasonsController;
   late Future _futureBuilderFuture;
   late ScrollController scrollController;
   late String category;
@@ -23,6 +24,9 @@ class _MemberSeasonsPageState extends State<MemberSeasonsPage> {
   void initState() {
     super.initState();
     category = Get.parameters['category']!;
+    final tag = '${Get.parameters['mid']}:$category:'
+        '${Get.parameters['seasonId'] ?? Get.parameters['seriesId']}';
+    _memberSeasonsController = Get.put(MemberSeasonsController(), tag: tag);
     _futureBuilderFuture = category == '0'
         ? _memberSeasonsController.getSeasonDetail('onRefresh')
         : _memberSeasonsController.getSeriesDetail('onRefresh');
@@ -60,7 +64,11 @@ class _MemberSeasonsPageState extends State<MemberSeasonsPage> {
             future: _futureBuilderFuture,
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.done) {
-                if (snapshot.data != null) {
+                if (snapshot.hasError) {
+                  return _error('合集详情页面异常\n'
+                      '${snapshot.error.runtimeType}: ${snapshot.error}');
+                }
+                if (snapshot.data is Map) {
                   Map data = snapshot.data as Map;
                   List list = _memberSeasonsController.seasonsList;
                   if (data['status']) {
@@ -89,20 +97,47 @@ class _MemberSeasonsPageState extends State<MemberSeasonsPage> {
                                 );
                               },
                             )
-                          : const SizedBox(),
+                          : const SizedBox(
+                              height: 500,
+                              child: CustomScrollView(slivers: [NoData()]),
+                            ),
                     );
                   } else {
-                    return const SizedBox();
+                    return _error(data['msg']?.toString() ?? '合集详情请求异常');
                   }
                 } else {
-                  return const SizedBox();
+                  return _error('合集详情接口没有返回有效数据');
                 }
               } else {
-                return const SizedBox();
+                return const Padding(
+                  padding: EdgeInsets.only(top: 120),
+                  child: Center(child: CircularProgressIndicator()),
+                );
               }
             },
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _error(String message) {
+    return SizedBox(
+      height: 500,
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          HttpError(
+            errMsg: message,
+            fn: () {
+              setState(() {
+                _futureBuilderFuture = category == '0'
+                    ? _memberSeasonsController.getSeasonDetail('onRefresh')
+                    : _memberSeasonsController.getSeriesDetail('onRefresh');
+              });
+            },
+          ),
+        ],
       ),
     );
   }

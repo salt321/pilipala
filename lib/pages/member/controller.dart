@@ -10,6 +10,7 @@ import 'package:pilipala/models/member/coin.dart';
 import 'package:pilipala/models/member/info.dart';
 import 'package:pilipala/models/member/like.dart';
 import 'package:pilipala/utils/storage.dart';
+import 'package:pilipala/utils/utils.dart';
 import 'package:share_plus/share_plus.dart';
 
 class MemberController extends GetxController {
@@ -36,8 +37,10 @@ class MemberController extends GetxController {
     userInfo = userInfoCache.get('userInfoCache');
     ownerMid = userInfo != null ? userInfo.mid : -1;
     isOwner.value = mid == ownerMid;
-    face.value = Get.arguments['face'] ?? '';
-    heroTag = Get.arguments['heroTag'] ?? '';
+    final Map<dynamic, dynamic> arguments =
+        Get.arguments is Map ? Get.arguments as Map : const {};
+    face.value = arguments['face']?.toString() ?? '';
+    heroTag = arguments['heroTag']?.toString() ?? Utils.makeHeroTag(mid);
     relationSearch();
   }
 
@@ -196,16 +199,15 @@ class MemberController extends GetxController {
 
   // 请求合集
   Future getMemberSeasons() async {
-    if (userInfo == null) return;
     var res = await MemberHttp.getMemberSeasons(mid, 1, 10);
     if (!res['status']) {
       SmartDialog.showToast("用户合集请求异常：${res['msg']}");
     } else {
       // 只取前四个专栏
-      res['data'].seasonsList.map((e) {
-        e.archives =
-            e.archives!.length > 4 ? e.archives!.sublist(0, 4) : e.archives!;
-      }).toList();
+      for (final e in res['data'].seasonsList ?? []) {
+        final archives = e.archives ?? [];
+        e.archives = archives.length > 4 ? archives.sublist(0, 4) : archives;
+      }
     }
     return res;
   }
@@ -227,19 +229,27 @@ class MemberController extends GetxController {
   }
 
   // 跳转查看动态
-  void pushDynamicsPage() => Get.toNamed('/memberDynamics?mid=$mid');
+  void pushDynamicsPage() => Get.toNamed(
+        '/memberDynamics',
+        parameters: {'mid': mid.toString()},
+      );
 
   // 跳转查看投稿
   void pushArchivesPage() => Get.toNamed('/memberArchive?mid=$mid');
 
   // 跳转查看专栏
-  void pushSeasonsPage() {}
+  void pushSeasonsPage() => Get.toNamed(
+        '/memberCollections',
+        parameters: {'mid': mid.toString()},
+      );
   // 跳转查看最近投币
   void pushRecentCoinsPage() async {
     if (recentCoinsList.isNotEmpty) {}
   }
 
-  void pushfavPage() => Get.toNamed('/fav?mid=$mid');
+  void pushfavPage() =>
+      Get.toNamed('/fav', parameters: {'mid': mid.toString()});
   // 跳转图文专栏
-  void pushArticlePage() => Get.toNamed('/memberArticle?mid=$mid');
+  void pushArticlePage() =>
+      Get.toNamed('/memberArticle', parameters: {'mid': mid.toString()});
 }

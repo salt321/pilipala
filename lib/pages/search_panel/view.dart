@@ -81,6 +81,23 @@ class _SearchPanelState extends State<SearchPanel>
         future: _futureBuilderFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.done) {
+            if (snapshot.hasError) {
+              return CustomScrollView(
+                physics: const NeverScrollableScrollPhysics(),
+                slivers: [
+                  HttpError(
+                    errMsg: '搜索流程异常\n'
+                        '${snapshot.error.runtimeType}: ${snapshot.error}',
+                    fn: () {
+                      setState(() {
+                        _futureBuilderFuture =
+                            _searchPanelController.onSearch();
+                      });
+                    },
+                  ),
+                ],
+              );
+            }
             if (snapshot.data != null) {
               Map data = snapshot.data;
               var ctr = _searchPanelController;
@@ -116,7 +133,8 @@ class _SearchPanelState extends State<SearchPanel>
                       errMsg: data['msg'],
                       fn: () {
                         setState(() {
-                          _searchPanelController.onSearch();
+                          _futureBuilderFuture =
+                              _searchPanelController.onSearch();
                         });
                       },
                     ),
@@ -131,7 +149,8 @@ class _SearchPanelState extends State<SearchPanel>
                     errMsg: '没有相关数据',
                     fn: () {
                       setState(() {
-                        _searchPanelController.onSearch();
+                        _futureBuilderFuture =
+                            _searchPanelController.onSearch();
                       });
                     },
                   ),

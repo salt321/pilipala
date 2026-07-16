@@ -22,17 +22,18 @@ class MemberDynamicsController extends GetxController {
       offset = '';
       dynamicsList.clear();
     }
-    if (offset == '-1') {
-      return;
+    if (offset == '-1' && type != 'onRefresh') {
+      return {'status': true, 'data': null};
     }
     var res = await MemberHttp.memberDynamic(
       offset: offset,
       mid: mid,
     );
     if (res['status']) {
-      dynamicsList.addAll(res['data'].items);
-      offset = res['data'].offset != '' ? res['data'].offset : '-1';
-      hasMore = res['data'].hasMore;
+      dynamicsList.addAll(res['data'].items ?? []);
+      final nextOffset = res['data'].offset?.toString() ?? '';
+      offset = nextOffset.isNotEmpty ? nextOffset : '-1';
+      hasMore = res['data'].hasMore ?? false;
     }
     return res;
   }

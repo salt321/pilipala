@@ -163,8 +163,8 @@ class _DynamicsPageState extends State<DynamicsPage>
                                 decoration: BoxDecoration(
                                   color: Theme.of(context)
                                       .colorScheme
-                                      .surfaceVariant
-                                      .withOpacity(0.7),
+                                      .surfaceContainerHighest
+                                      .withValues(alpha: 0.7),
                                   borderRadius: BorderRadius.circular(20),
                                 ),
                                 thumbDecoration: BoxDecoration(
@@ -198,6 +198,9 @@ class _DynamicsPageState extends State<DynamicsPage>
               future: _futureBuilderFutureUp,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.done) {
+                  if (snapshot.hasError) {
+                    return const SliverToBoxAdapter(child: SizedBox());
+                  }
                   if (snapshot.data == null) {
                     return const SliverToBoxAdapter(child: SizedBox());
                   }
@@ -236,8 +239,30 @@ class _DynamicsPageState extends State<DynamicsPage>
               future: _futureBuilderFuture,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.done) {
+                  if (snapshot.hasError) {
+                    return HttpError(
+                      errMsg: '动态页面异常\n'
+                          '${snapshot.error.runtimeType}: ${snapshot.error}',
+                      fn: () {
+                        setState(() {
+                          _futureBuilderFuture =
+                              _dynamicsController.queryFollowDynamic();
+                          _futureBuilderFutureUp =
+                              _dynamicsController.queryFollowUp();
+                        });
+                      },
+                    );
+                  }
                   if (snapshot.data == null) {
-                    return const SliverToBoxAdapter(child: SizedBox());
+                    return HttpError(
+                      errMsg: '动态接口没有返回有效数据',
+                      fn: () {
+                        setState(() {
+                          _futureBuilderFuture =
+                              _dynamicsController.queryFollowDynamic();
+                        });
+                      },
+                    );
                   }
                   Map? data = snapshot.data;
                   if (data != null && data['status']) {

@@ -126,7 +126,7 @@ class Request {
     var html = await Request().get(Api.dynamicSpmPrefix);
     String spmPrefix = spmPrefixExp.firstMatch(html.data)!.group(1)!;
     Random rand = Random();
-    String rand_png_end = base64.encode(
+    String randPngEnd = base64.encode(
         List<int>.generate(32, (_) => rand.nextInt(256)) +
             List<int>.filled(4, 0) +
             [73, 69, 78, 68] +
@@ -134,10 +134,10 @@ class Request {
 
     String jsonData = json.encode({
       '3064': 1,
-      '39c8': '${spmPrefix}.fp.risk',
+      '39c8': '$spmPrefix.fp.risk',
       '3c43': {
         'adca': 'Linux',
-        'bfe9': rand_png_end.substring(rand_png_end.length - 50),
+        'bfe9': randPngEnd.substring(randPngEnd.length - 50),
       },
     });
 
@@ -316,11 +316,12 @@ class Request {
             'Mozilla/5.0 (iPhone; CPU iPhone OS 14_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1 Mobile/15E148 Safari/604.1';
       } else {
         headerUa =
-            'Mozilla/5.0 (Linux; Android 10; SM-G975F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.101 Mobile Safari/537.36';
+            'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 '
+            '(KHTML, like Gecko) Chrome/138.0.0.0 Mobile Safari/537.36';
       }
     } else {
-      headerUa =
-          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.2 Safari/605.1.15';
+      headerUa = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+          '(KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36';
     }
     return headerUa;
   }

@@ -1,180 +1,32 @@
-// 内容
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
-import 'package:pilipala/common/widgets/badge.dart';
 import 'package:pilipala/common/widgets/network_img_layer.dart';
 import 'package:pilipala/models/dynamics/result.dart';
 import 'package:pilipala/plugin/pl_gallery/index.dart';
+
 import 'rich_node_panel.dart';
 
-// ignore: must_be_immutable
-class Content extends StatefulWidget {
-  dynamic item;
-  String? source;
-  Content({
+/// 动态正文。兼容旧版 desc、DRAW 以及新版 OPUS 字段。
+class Content extends StatelessWidget {
+  const Content({
     super.key,
-    this.item,
+    required this.item,
     this.source,
   });
 
-  @override
-  State<Content> createState() => _ContentState();
-}
+  final DynamicItemModel item;
+  final String? source;
 
-class _ContentState extends State<Content> {
-  late bool hasPics;
-  List<OpusPicsModel> pics = [];
-
-  @override
-  void initState() {
-    super.initState();
-    hasPics = widget.item.modules.moduleDynamic.major != null &&
-        widget.item.modules.moduleDynamic.major.opus != null &&
-        widget.item.modules.moduleDynamic.major.opus.pics.isNotEmpty;
-    if (hasPics) {
-      pics = widget.item.modules.moduleDynamic.major.opus.pics;
-    }
-  }
-
-  InlineSpan picsNodes() {
-    List<InlineSpan> spanChilds = [];
-    int len = pics.length;
-    List<String> picList = [];
-
-    if (len == 1) {
-      OpusPicsModel pictureItem = pics.first;
-      picList.add(pictureItem.url!);
-
-      /// 图片上方的空白间隔
-      // spanChilds.add(const TextSpan(text: '\n'));
-      spanChilds.add(
-        WidgetSpan(
-          child: LayoutBuilder(
-            builder: (context, BoxConstraints box) {
-              double maxWidth = box.maxWidth.truncateToDouble();
-              double maxHeight = box.maxWidth * 0.6; // 设置最大高度
-              double height = maxWidth *
-                  0.5 *
-                  (pictureItem.height != null && pictureItem.width != null
-                      ? pictureItem.height! / pictureItem.width!
-                      : 1);
-              return Hero(
-                tag: pictureItem.url!,
-                placeholderBuilder:
-                    (BuildContext context, Size heroSize, Widget child) {
-                  return child;
-                },
-                child: GestureDetector(
-                  onTap: () => onPreviewImg(picList, 1, context),
-                  child: Container(
-                    padding: const EdgeInsets.only(top: 4),
-                    constraints: BoxConstraints(maxHeight: maxHeight),
-                    width: box.maxWidth / 2,
-                    height: height,
-                    child: Stack(
-                      children: [
-                        Positioned.fill(
-                          child: NetworkImgLayer(
-                            src: pictureItem.url,
-                            width: maxWidth / 2,
-                            height: height,
-                          ),
-                        ),
-                        height > Get.size.height * 0.9
-                            ? const PBadge(
-                                text: '长图',
-                                right: 8,
-                                bottom: 8,
-                              )
-                            : const SizedBox(),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-      );
-    }
-    if (len > 1) {
-      List<Widget> list = [];
-      for (var i = 0; i < len; i++) {
-        picList.add(pics[i].url!);
-      }
-      for (var i = 0; i < len; i++) {
-        list.add(
-          LayoutBuilder(
-            builder: (context, BoxConstraints box) {
-              double maxWidth = box.maxWidth.truncateToDouble();
-              return Hero(
-                tag: picList[i],
-                child: GestureDetector(
-                  onTap: () => onPreviewImg(picList, i, context),
-                  child: NetworkImgLayer(
-                    src: pics[i].url,
-                    width: maxWidth,
-                    height: maxWidth,
-                    origAspectRatio:
-                        pics[i].width!.toInt() / pics[i].height!.toInt(),
-                  ),
-                ),
-              );
-            },
-          ),
-        );
-      }
-      spanChilds.add(
-        WidgetSpan(
-          child: LayoutBuilder(
-            builder: (context, BoxConstraints box) {
-              double maxWidth = box.maxWidth.truncateToDouble();
-              double crossCount = len < 3 ? 2 : 3;
-              double height = maxWidth /
-                      crossCount *
-                      (len % crossCount == 0
-                          ? len ~/ crossCount
-                          : len ~/ crossCount + 1) +
-                  6;
-              return Container(
-                padding: const EdgeInsets.only(top: 6),
-                height: height,
-                child: GridView.count(
-                  padding: EdgeInsets.zero,
-                  physics: const NeverScrollableScrollPhysics(),
-                  crossAxisCount: crossCount.toInt(),
-                  mainAxisSpacing: 4.0,
-                  crossAxisSpacing: 4.0,
-                  childAspectRatio: 1,
-                  children: list,
-                ),
-              );
-            },
-          ),
-        ),
-      );
-    }
-    return TextSpan(
-      children: spanChilds,
-    );
-  }
-
-  void onPreviewImg(picList, initIndex, context) {
-    Navigator.of(context).push(
-      HeroDialogRoute<void>(
-        builder: (BuildContext context) => InteractiveviewerGallery(
-          sources: picList,
-          initIndex: initIndex,
-          onPageChanged: (int pageIndex) {},
-        ),
-      ),
-    );
-  }
+  bool get _expanded => source == 'detail' || source == 'member';
 
   @override
   Widget build(BuildContext context) {
-    TextStyle authorStyle =
-        TextStyle(color: Theme.of(context).colorScheme.primary);
+    final data = item.modules?.moduleDynamic;
+    if (data == null) return const SizedBox.shrink();
+    final nodes = data.desc?.richTextNodes?.isNotEmpty == true
+        ? data.desc!.richTextNodes
+        : data.major?.opus?.summary?.richTextNodes;
+    final plainText = _contentText(data);
+    final images = _opusImages(data);
 
     return Container(
       width: double.infinity,
@@ -182,35 +34,136 @@ class _ContentState extends State<Content> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (widget.item.modules.moduleDynamic.topic != null) ...[
-            GestureDetector(
-              child: Text(
-                '#${widget.item.modules.moduleDynamic.topic.name}',
-                style: authorStyle,
-              ),
+          if (data.topic?.name?.isNotEmpty == true)
+            Text(
+              '#${data.topic!.name}',
+              style: TextStyle(color: Theme.of(context).colorScheme.primary),
             ),
-          ],
-          IgnorePointer(
-            // 禁用SelectableRegion的触摸交互功能
-            ignoring: widget.source == 'detail' ? false : true,
-            child: SelectableRegion(
-              magnifierConfiguration: const TextMagnifierConfiguration(),
-              focusNode: FocusNode(),
-              selectionControls: MaterialTextSelectionControls(),
+          if (nodes?.isNotEmpty == true)
+            IgnorePointer(
+              ignoring: !_expanded,
               child: Text.rich(
-                /// fix 默认20px高度
-                style: const TextStyle(height: 0),
-                richNode(widget.item, context),
-                maxLines: widget.source == 'detail' ? 999 : 3,
-                overflow: TextOverflow.ellipsis,
+                richNode(item, context),
+                maxLines: _expanded ? null : 3,
+                overflow:
+                    _expanded ? TextOverflow.visible : TextOverflow.ellipsis,
               ),
+            )
+          else if (plainText.isNotEmpty)
+            Text(
+              plainText,
+              maxLines: _expanded ? null : 3,
+              overflow:
+                  _expanded ? TextOverflow.visible : TextOverflow.ellipsis,
             ),
-          ),
-          if (hasPics) ...[
-            Text.rich(picsNodes()),
-          ]
+          if (images.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            _images(context, images),
+          ],
         ],
       ),
     );
   }
+
+  String _contentText(ModuleDynamicModel data) {
+    final parts = <String>[];
+    final values = <String?>[
+      data.major?.opus?.title,
+      data.desc?.text,
+      data.major?.opus?.summary?.text,
+    ];
+    for (final value in values) {
+      final normalized = value?.trim() ?? '';
+      if (normalized.isNotEmpty && !parts.contains(normalized)) {
+        parts.add(normalized);
+      }
+    }
+    return parts.join('\n');
+  }
+
+  List<_DynamicImage> _opusImages(ModuleDynamicModel data) {
+    return (data.major?.opus?.pics ?? const <OpusPicsModel>[])
+        .map(
+          (pic) => _DynamicImage(
+            url: pic.url ?? pic.src ?? '',
+            width: pic.width,
+            height: pic.height,
+          ),
+        )
+        .where((pic) => pic.url.isNotEmpty)
+        .toList();
+  }
+
+  Widget _images(BuildContext context, List<_DynamicImage> images) {
+    final urls = images.map((image) => image.url).toList();
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth.isFinite
+            ? constraints.maxWidth
+            : MediaQuery.sizeOf(context).width - 24;
+        if (images.length == 1) {
+          final image = images.first;
+          final ratio = _ratio(image);
+          final imageWidth = width / 2;
+          final imageHeight = (imageWidth / ratio).clamp(100.0, 360.0);
+          return GestureDetector(
+            onTap: () => _preview(context, urls, 0),
+            child: NetworkImgLayer(
+              src: image.url,
+              width: imageWidth,
+              height: imageHeight,
+              origAspectRatio: ratio,
+            ),
+          );
+        }
+        final columns = images.length < 3 ? 2 : 3;
+        final tileSize = (width - (columns - 1) * 4) / columns;
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: images.length,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: columns,
+            crossAxisSpacing: 4,
+            mainAxisSpacing: 4,
+          ),
+          itemBuilder: (context, index) => GestureDetector(
+            onTap: () => _preview(context, urls, index),
+            child: NetworkImgLayer(
+              src: images[index].url,
+              width: tileSize,
+              height: tileSize,
+              origAspectRatio: _ratio(images[index]),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  double _ratio(_DynamicImage image) {
+    final width = image.width ?? 0;
+    final height = image.height ?? 0;
+    return width > 0 && height > 0 ? width / height : 1;
+  }
+
+  void _preview(BuildContext context, List<String> urls, int index) {
+    Navigator.of(context).push(
+      HeroDialogRoute<void>(
+        builder: (_) => InteractiveviewerGallery(
+          sources: urls,
+          initIndex: index,
+          onPageChanged: (_) {},
+        ),
+      ),
+    );
+  }
+}
+
+class _DynamicImage {
+  const _DynamicImage({required this.url, this.width, this.height});
+
+  final String url;
+  final int? width;
+  final int? height;
 }

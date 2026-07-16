@@ -68,12 +68,13 @@ Widget forWard(item, context, ctr, source, {floor = 1}) {
             ),
             const SizedBox(height: 4),
           ],
-          Padding(
-            padding: floor == 2
-                ? EdgeInsets.zero
-                : const EdgeInsets.only(left: 12, right: 12),
-            child: picWidget(item, context),
-          ),
+          if (item.modules.moduleDynamic.major?.draw != null)
+            Padding(
+              padding: floor == 2
+                  ? EdgeInsets.zero
+                  : const EdgeInsets.only(left: 12, right: 12),
+              child: picWidget(item, context),
+            ),
 
           /// 附加内容 商品信息、直播预约等等
           if (item.modules.moduleDynamic.additional != null)
@@ -98,7 +99,7 @@ Widget forWard(item, context, ctr, source, {floor = 1}) {
         child: Container(
           padding:
               const EdgeInsets.only(left: 15, top: 10, right: 15, bottom: 8),
-          color: Theme.of(context).dividerColor.withOpacity(0.08),
+          color: Theme.of(context).dividerColor.withValues(alpha: 0.08),
           child: forWard(item.orig, context, ctr, source, floor: floor + 1),
         ),
       );
@@ -199,7 +200,7 @@ Widget forWard(item, context, ctr, source, {floor = 1}) {
             width: double.infinity,
             padding:
                 const EdgeInsets.only(left: 12, top: 10, right: 12, bottom: 10),
-            color: Theme.of(context).dividerColor.withOpacity(0.08),
+            color: Theme.of(context).dividerColor.withValues(alpha: 0.08),
             child: Row(
               children: [
                 NetworkImgLayer(
@@ -254,7 +255,7 @@ Widget forWard(item, context, ctr, source, {floor = 1}) {
             width: double.infinity,
             padding:
                 const EdgeInsets.only(left: 12, top: 10, right: 12, bottom: 10),
-            color: Theme.of(context).dividerColor.withOpacity(0.08),
+            color: Theme.of(context).dividerColor.withValues(alpha: 0.08),
             child: Row(
               children: [
                 NetworkImgLayer(

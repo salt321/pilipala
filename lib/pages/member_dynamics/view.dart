@@ -5,6 +5,7 @@ import 'package:pilipala/pages/member_dynamics/index.dart';
 import 'package:pilipala/utils/utils.dart';
 
 import '../../common/widgets/http_error.dart';
+import '../../common/widgets/no_data.dart';
 import '../../models/dynamics/result.dart';
 import '../dynamics/widgets/dynamic_panel.dart';
 
@@ -65,7 +66,14 @@ class _MemberDynamicsPageState extends State<MemberDynamicsPage> {
             future: _futureBuilderFuture,
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.done) {
-                if (snapshot.data != null) {
+                if (snapshot.hasError) {
+                  return HttpError(
+                    errMsg: '用户动态页面异常\n'
+                        '${snapshot.error.runtimeType}: ${snapshot.error}',
+                    fn: _retry,
+                  );
+                }
+                if (snapshot.data is Map) {
                   Map data = snapshot.data as Map;
                   RxList<DynamicItemModel> list =
                       _memberDynamicController.dynamicsList;
@@ -75,32 +83,59 @@ class _MemberDynamicsPageState extends State<MemberDynamicsPage> {
                           ? SliverList(
                               delegate: SliverChildBuilderDelegate(
                                 (context, index) {
-                                  return DynamicPanel(item: list[index]);
+                                  if (index == 0) {
+                                    final model = data['data'];
+                                    return Padding(
+                                      padding: const EdgeInsets.fromLTRB(
+                                          16, 10, 16, 4),
+                                      child: Text(
+                                        '接口获取 ${model?.rawItemCount ?? list.length} 条，'
+                                        '成功显示 ${list.length} 条',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .labelSmall,
+                                      ),
+                                    );
+                                  }
+                                  return DynamicPanel(
+                                    item: list[index - 1],
+                                    source: 'member',
+                                    showActions: true,
+                                  );
                                 },
-                                childCount: list.length,
+                                childCount: list.length + 1,
                               ),
                             )
-                          : const SliverToBoxAdapter(),
+                          : const NoData(),
                     );
                   } else {
                     return HttpError(
                       errMsg: snapshot.data['msg'],
-                      fn: () {},
+                      fn: _retry,
                     );
                   }
                 } else {
                   return HttpError(
-                    errMsg: snapshot.data['msg'],
-                    fn: () {},
+                    errMsg: '用户动态接口没有返回有效数据',
+                    fn: _retry,
                   );
                 }
               } else {
-                return const SliverToBoxAdapter();
+                return const SliverFillRemaining(
+                  child: Center(child: CircularProgressIndicator()),
+                );
               }
             },
           ),
         ],
       ),
     );
+  }
+
+  void _retry() {
+    setState(() {
+      _futureBuilderFuture =
+          _memberDynamicController.getMemberDynamic('onRefresh');
+    });
   }
 }

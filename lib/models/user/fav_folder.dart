@@ -10,13 +10,13 @@ class FavFolderData {
   bool? hasMore;
 
   FavFolderData.fromJson(Map<String, dynamic> json) {
-    count = json['count'];
+    count = (json['count'] as num?)?.toInt() ?? 0;
     list = json['list'] != null
         ? json['list']
             .map<FavFolderItemData>((e) => FavFolderItemData.fromJson(e))
             .toList()
         : <FavFolderItemData>[];
-    hasMore = json['has_more'];
+    hasMore = json['has_more'] == true;
   }
 }
 

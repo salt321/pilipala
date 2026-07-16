@@ -59,6 +59,12 @@ linked_*.ds
 unlinked.ds
 unlinked_spec.ds
 
+# Machine-local dependency compatibility layer.
+# These packages are copied locally for the custom Flutter SDK and are not
+# part of the application source tree.
+/third_party/
+/pubspec_overrides.yaml
+
 # Obfuscation related
 app.*.map.json
 

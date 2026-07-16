@@ -35,6 +35,7 @@ def _storeFile = file(System.getenv("KEYSTORE") ?: keystoreProperties["storeFile
 def _storePassword = System.getenv("KEYSTORE_PASSWORD") ?: keystoreProperties["storePassword"]
 def _keyAlias = System.getenv("KEY_ALIAS") ?: keystoreProperties["keyAlias"]
 def _keyPassword = System.getenv("KEY_PASSWORD") ?: keystoreProperties["keyPassword"]
+def _hasReleaseSigning = _storeFile.exists() && _storePassword && _keyAlias && _keyPassword
 
 android {
     compileSdkVersion flutter.compileSdkVersion
@@ -80,9 +81,8 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig signingConfigs.release
+            // 源码包通常不包含私有发布密钥；缺失时生成可安装的测试包。
+            signingConfig _hasReleaseSigning ? signingConfigs.release : signingConfigs.debug
         }
     }
 }

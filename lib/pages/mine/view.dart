@@ -124,7 +124,8 @@ class _MinePageState extends State<MinePage> {
                     ? NetworkImgLayer(
                         src: _mineController.userInfo.value.face,
                         width: 85,
-                        height: 85)
+                        height: 85,
+                        type: 'avatar')
                     : Image.asset('assets/images/noface.jpeg'),
               ),
             ),

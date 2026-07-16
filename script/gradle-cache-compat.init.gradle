@@ -1,0 +1,72 @@
+// Older Flutter plugins often declare their own Android Gradle Plugin (AGP)
+// classpath. Reuse the app's AGP instead, avoiding duplicate legacy toolchains.
+gradle.beforeProject { project ->
+    def localFlutterMaven = new File(project.rootDir.parentFile,
+        'build/local-flutter-maven')
+    def localGradleMaven = new File(project.rootDir.parentFile,
+        'build/local-gradle-maven')
+    def localFlutterRepository = project.repositories.maven { repository ->
+        repository.url = localFlutterMaven.toURI()
+    }
+    def localGradleRepository = project.repositories.maven { repository ->
+        repository.url = localGradleMaven.toURI()
+    }
+    project.repositories.exclusiveContent {
+        forRepositories(localFlutterRepository, localGradleRepository)
+        filter {
+            includeGroup('io.flutter')
+            includeGroupByRegex('androidx\\..*')
+            includeGroup('com.getkeepsafe.relinker')
+            includeGroup('com.afollestad.material-dialogs')
+            includeGroup('com.google.android.material')
+            includeGroup('com.geetest.sensebot')
+            includeGroupByRegex('com\\.squareup(\\..*)?')
+            includeGroup('me.zhanghai.android.materialprogressbar')
+            includeGroupByRegex('org\\.jetbrains(\\..*)?')
+            includeGroup('com.google.guava')
+        }
+    }
+    project.repositories.maven { repository ->
+        repository.url = uri('https://maven.aliyun.com/repository/google')
+    }
+    project.repositories.maven { repository ->
+        repository.url = uri('https://maven.aliyun.com/repository/public')
+    }
+
+    if (project.path != ':') {
+        project.buildscript.configurations.matching {
+            it.name == 'classpath'
+        }.all { classpathConfiguration ->
+            classpathConfiguration.withDependencies { dependencies ->
+                dependencies.removeAll { dependency ->
+                    (dependency.group == 'com.android.tools.build' &&
+                        dependency.name == 'gradle') ||
+                        (dependency.group == 'org.jetbrains.kotlin' &&
+                            dependency.name == 'kotlin-gradle-plugin')
+                }
+            }
+        }
+    }
+}
+
+gradle.afterProject { project ->
+    if (project.extensions.findByName('android') != null) {
+        project.android.compileSdkVersion 35
+        project.android.buildToolsVersion = '35.0.0'
+
+        def typedefFile = new File(project.buildDir,
+            'intermediates/annotations_typedef_file/release/typedefs.txt')
+        typedefFile.parentFile.mkdirs()
+        if (!typedefFile.exists()) {
+            typedefFile.createNewFile()
+        }
+    }
+
+    project.tasks.configureEach { task ->
+        def taskName = task.name.toLowerCase()
+        if (taskName.contains('lint') ||
+            taskName == 'extractreleaseannotations') {
+            task.enabled = false
+        }
+    }
+}

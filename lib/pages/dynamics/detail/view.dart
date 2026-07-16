@@ -9,15 +9,13 @@ import 'package:pilipala/common/widgets/http_error.dart';
 import 'package:pilipala/models/common/reply_type.dart';
 import 'package:pilipala/models/dynamics/result.dart';
 import 'package:pilipala/pages/dynamics/detail/index.dart';
-import 'package:pilipala/pages/dynamics/widgets/author_panel.dart';
+import 'package:pilipala/pages/dynamics/widgets/dynamic_panel.dart';
 import 'package:pilipala/pages/video/detail/reply/widgets/reply_item.dart';
 import 'package:pilipala/pages/video/detail/reply_new/index.dart';
 import 'package:pilipala/pages/video/detail/reply_reply/index.dart';
 import 'package:pilipala/utils/feed_back.dart';
-import 'package:pilipala/utils/id_utils.dart';
 
 import '../../../models/video/reply/item.dart';
-import '../widgets/dynamic_panel.dart';
 
 class DynamicDetailPage extends StatefulWidget {
   // const DynamicDetailPage({super.key});
@@ -41,8 +39,6 @@ class _DynamicDetailPageState extends State<DynamicDetailPage>
   late int replyType;
   bool _isFabVisible = true;
   int oid = 0;
-  int? opusId;
-  bool isOpusId = false;
 
   @override
   void initState() {
@@ -64,45 +60,29 @@ class _DynamicDetailPageState extends State<DynamicDetailPage>
   }
 
   // 页面初始化
-  void init() async {
-    Map args = Get.arguments;
-    // 楼层
-    int floor = args['floor'];
+  void init() {
+    final Map args =
+        Get.arguments is Map ? Get.arguments as Map : <dynamic, dynamic>{};
+    final DynamicItemModel item = args['item'] as DynamicItemModel;
+    final int floor = args['floor'] is int ? args['floor'] as int : 1;
     // 从action栏点击进入
-    action = args.containsKey('action') ? args['action'] : null;
+    action = args['action']?.toString();
     // 评论类型
-    int commentType = args['item'].basic!['comment_type'] ?? 11;
+    final int commentType =
+        int.tryParse(item.basic?['comment_type']?.toString() ?? '') ?? 11;
     replyType = (commentType == 0) ? 11 : commentType;
-
-    if (floor == 1) {
-      oid = int.parse(args['item'].basic!['comment_id_str']);
-    } else {
-      try {
-        ModuleDynamicModel moduleDynamic = args['item'].modules.moduleDynamic;
-        String majorType = moduleDynamic.major!.type!;
-
-        if (majorType == 'MAJOR_TYPE_OPUS') {
-          // 转发的动态
-          String jumpUrl = moduleDynamic.major!.opus!.jumpUrl!;
-          opusId = int.parse(jumpUrl.split('/').last);
-          if (opusId != null) {
-            isOpusId = true;
-            _dynamicDetailController = Get.put(
-                DynamicDetailController(oid, replyType),
-                tag: opusId.toString());
-            await _dynamicDetailController.reqHtmlByOpusId(opusId!);
-            setState(() {});
-          }
-        } else {
-          oid = moduleDynamic.major!.draw!.id!;
-        }
-      } catch (_) {}
-    }
-    if (!isOpusId) {
-      _dynamicDetailController =
-          Get.put(DynamicDetailController(oid, replyType), tag: oid.toString());
-    }
-    _futureBuilderFuture = _dynamicDetailController.queryReplyList();
+    oid = int.tryParse(item.basic?['comment_id_str']?.toString() ?? '') ?? 0;
+    _dynamicDetailController = Get.put(
+      DynamicDetailController(oid, replyType),
+      tag: 'dynamic_${item.idStr ?? oid}_$floor',
+    );
+    _futureBuilderFuture = oid > 0
+        ? _dynamicDetailController.queryReplyList()
+        : Future.value(<String, dynamic>{
+            'status': false,
+            'code': -1,
+            'msg': '该动态没有可用的评论标识',
+          });
   }
 
   // 查看二级评论
@@ -203,7 +183,12 @@ class _DynamicDetailPageState extends State<DynamicDetailPage>
             return AnimatedOpacity(
               opacity: snapshot.data ? 1 : 0,
               duration: const Duration(milliseconds: 300),
-              child: AuthorPanel(item: _dynamicDetailController.item),
+              child: Text(
+                _dynamicDetailController.item?.modules?.moduleAuthor?.name ??
+                    '动态详情',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             );
           },
         ),
@@ -221,6 +206,8 @@ class _DynamicDetailPageState extends State<DynamicDetailPage>
                 child: DynamicPanel(
                   item: _dynamicDetailController.item,
                   source: 'detail',
+                  openDetailOnTap: false,
+                  showActions: true,
                 ),
               ),
             SliverPersistentHeader(
@@ -231,7 +218,9 @@ class _DynamicDetailPageState extends State<DynamicDetailPage>
                     border: Border(
                       top: BorderSide(
                         width: 0.6,
-                        color: Theme.of(context).dividerColor.withOpacity(0.05),
+                        color: Theme.of(context)
+                            .dividerColor
+                            .withValues(alpha: 0.05),
                       ),
                     ),
                   ),
@@ -278,8 +267,14 @@ class _DynamicDetailPageState extends State<DynamicDetailPage>
               future: _futureBuilderFuture,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.done) {
-                  Map data = snapshot.data as Map;
-                  if (snapshot.data['status']) {
+                  if (snapshot.hasError || snapshot.data is! Map) {
+                    return HttpError(
+                      errMsg: snapshot.error?.toString() ?? '评论加载失败',
+                      fn: _reloadReplies,
+                    );
+                  }
+                  final Map data = snapshot.data as Map;
+                  if (data['status'] == true) {
                     RxList<ReplyItemModel> replyList =
                         _dynamicDetailController.replyList;
                     // 请求成功
@@ -345,8 +340,8 @@ class _DynamicDetailPageState extends State<DynamicDetailPage>
                   } else {
                     // 请求错误
                     return HttpError(
-                      errMsg: data['msg'],
-                      fn: () => setState(() {}),
+                      errMsg: data['msg']?.toString() ?? '评论加载失败',
+                      fn: _reloadReplies,
                     );
                   }
                 } else {
@@ -373,7 +368,7 @@ class _DynamicDetailPageState extends State<DynamicDetailPage>
           ),
         ),
         child: Obx(
-          () => _dynamicDetailController.replyReqCode.value == 12061
+          () => oid <= 0 || _dynamicDetailController.replyReqCode.value == 12061
               ? const SizedBox()
               : FloatingActionButton(
                   heroTag: null,
@@ -384,8 +379,7 @@ class _DynamicDetailPageState extends State<DynamicDetailPage>
                       isScrollControlled: true,
                       builder: (BuildContext context) {
                         return VideoReplyNewDialog(
-                          oid: _dynamicDetailController.oid ??
-                              IdUtils.bv2av(Get.parameters['bvid']!),
+                          oid: _dynamicDetailController.oid!,
                           root: 0,
                           parent: 0,
                           replyType: ReplyType.values[replyType],
@@ -409,6 +403,13 @@ class _DynamicDetailPageState extends State<DynamicDetailPage>
         ),
       ),
     );
+  }
+
+  void _reloadReplies() {
+    if (oid <= 0) return;
+    setState(() {
+      _futureBuilderFuture = _dynamicDetailController.queryReplyList();
+    });
   }
 }
 

@@ -13,7 +13,7 @@ class FansController extends GetxController {
   RxList<FansItemModel> fansList = <FansItemModel>[].obs;
   late int mid;
   late String name;
-  var userInfo;
+  dynamic userInfo;
   RxString loadingText = '加载中...'.obs;
   RxBool isOwner = false.obs;
 
@@ -31,9 +31,10 @@ class FansController extends GetxController {
   Future queryFans(type) async {
     if (type == 'init') {
       pn = 1;
-      loadingText.value == '加载中...';
+      loadingText.value = '加载中...';
+      fansList.clear();
     }
-    if (loadingText.value == '没有更多了') {
+    if (type != 'init' && loadingText.value == '没有更多了') {
       return;
     }
     var res = await FanHttp.fans(
@@ -43,13 +44,15 @@ class FansController extends GetxController {
       orderType: 'attention',
     );
     if (res['status']) {
+      final List<FansItemModel> incoming =
+          List<FansItemModel>.from(res['data'].list ?? const []);
       if (type == 'init') {
-        fansList.value = res['data'].list;
-        total = res['data'].total;
+        fansList.value = incoming;
+        total = res['data'].total ?? 0;
       } else if (type == 'onLoad') {
-        fansList.addAll(res['data'].list);
+        fansList.addAll(incoming);
       }
-      if ((pn == 1 && total < ps) || res['data'].list.isEmpty) {
+      if ((pn == 1 && total < ps) || incoming.isEmpty) {
         loadingText.value = '没有更多了';
       }
       pn += 1;

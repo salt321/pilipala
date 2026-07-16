@@ -56,10 +56,14 @@ class _MemberArticlePageState extends State<MemberArticlePage> {
         future: _futureBuilderFuture,
         builder: (BuildContext context, snapshot) {
           if (snapshot.connectionState == ConnectionState.done) {
-            if (snapshot.data != null) {
+            if (snapshot.hasError) {
+              return _buildError('专栏页面异常\n'
+                  '${snapshot.error.runtimeType}: ${snapshot.error}');
+            }
+            if (snapshot.data is Map) {
               return _buildContent(snapshot.data as Map);
             } else {
-              return _buildError(snapshot.data['msg']);
+              return _buildError('专栏接口没有返回有效数据');
             }
           } else {
             return ListView.builder(
@@ -85,7 +89,8 @@ class _MemberArticlePageState extends State<MemberArticlePage> {
                 separatorBuilder: (BuildContext context, int index) {
                   return Divider(
                     height: 10,
-                    color: Theme.of(context).dividerColor.withOpacity(0.15),
+                    color:
+                        Theme.of(context).dividerColor.withValues(alpha: 0.15),
                   );
                 },
                 itemBuilder: (BuildContext context, int index) {
@@ -117,7 +122,7 @@ class _MemberArticlePageState extends State<MemberArticlePage> {
         width: 50,
         height: 50,
         type: 'emote',
-        src: item.cover['url'],
+        src: item.cover?['url']?.toString() ?? '',
       ),
       title: Text(
         item.content,
@@ -127,7 +132,7 @@ class _MemberArticlePageState extends State<MemberArticlePage> {
       subtitle: Padding(
         padding: const EdgeInsets.only(top: 4),
         child: Text(
-          '${item.stat["like"]}人点赞',
+          '${item.stat?["like"] ?? 0}人点赞',
           style: TextStyle(
             fontSize: 12,
             color: Theme.of(context).colorScheme.outline,
@@ -139,13 +144,16 @@ class _MemberArticlePageState extends State<MemberArticlePage> {
 
   Widget _buildError(String errMsg) {
     return CustomScrollView(
-      physics: const NeverScrollableScrollPhysics(),
+      physics: const AlwaysScrollableScrollPhysics(),
       slivers: [
-        SliverToBoxAdapter(
-          child: HttpError(
-            errMsg: errMsg,
-            fn: () {},
-          ),
+        HttpError(
+          errMsg: errMsg,
+          fn: () {
+            setState(() {
+              _futureBuilderFuture =
+                  _memberArticleController.getMemberArticle('init');
+            });
+          },
         ),
       ],
     );

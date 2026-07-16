@@ -71,11 +71,17 @@ class _FavPageState extends State<FavPage> {
                   tooltip: '新建收藏夹',
                 )
               : const SizedBox.shrink()),
-          IconButton(
-            onPressed: () => Get.toNamed(
-                '/favSearch?searchType=1&mediaId=${_favController.favFolderData.value.list!.first.id}'),
-            icon: const Icon(Icons.search_outlined),
-          ),
+          Obx(() {
+            final folders = _favController.favFolderList;
+            final mediaId = folders.isNotEmpty ? folders.first.id : null;
+            return IconButton(
+              onPressed: mediaId == null
+                  ? null
+                  : () =>
+                      Get.toNamed('/favSearch?searchType=1&mediaId=$mediaId'),
+              icon: const Icon(Icons.search_outlined),
+            );
+          }),
           const SizedBox(width: 14),
         ],
       ),
@@ -100,16 +106,26 @@ class _FavPageState extends State<FavPage> {
           Map? data = snapshot.data;
           if (data != null && data['status']) {
             return Obx(
-              () => ListView.builder(
-                controller: scrollController,
-                itemCount: _favController.favFolderList.length,
-                itemBuilder: (context, index) {
-                  return FavItem(
-                    favFolderItem: _favController.favFolderList[index],
-                    isOwner: _favController.isOwner.value,
-                  );
-                },
-              ),
+              () => _favController.favFolderList.isEmpty
+                  ? const CustomScrollView(
+                      physics: AlwaysScrollableScrollPhysics(),
+                      slivers: [
+                        SliverFillRemaining(
+                          hasScrollBody: false,
+                          child: Center(child: Text('暂无公开收藏夹')),
+                        ),
+                      ],
+                    )
+                  : ListView.builder(
+                      controller: scrollController,
+                      itemCount: _favController.favFolderList.length,
+                      itemBuilder: (context, index) {
+                        return FavItem(
+                          favFolderItem: _favController.favFolderList[index],
+                          isOwner: _favController.isOwner.value,
+                        );
+                      },
+                    ),
             );
           } else {
             return CustomScrollView(

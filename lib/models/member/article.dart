@@ -12,12 +12,18 @@ class MemberArticleDataModel {
   int? updateNum;
 
   MemberArticleDataModel.fromJson(Map<String, dynamic> json) {
-    hasMore = json['has_more'];
-    items = json['items']
-        .map<MemberArticleItemModel>((e) => MemberArticleItemModel.fromJson(e))
-        .toList();
-    offset = json['offset'];
-    updateNum = json['update_num'];
+    hasMore = json['has_more'] == true;
+    final rawItems = json['items'];
+    items = rawItems is List
+        ? rawItems
+            .whereType<Map>()
+            .map((e) => MemberArticleItemModel.fromJson(
+                  Map<String, dynamic>.from(e),
+                ))
+            .toList()
+        : <MemberArticleItemModel>[];
+    offset = json['offset']?.toString();
+    updateNum = (json['update_num'] as num?)?.toInt() ?? 0;
   }
 }
 
@@ -37,10 +43,10 @@ class MemberArticleItemModel {
   Map? stat;
 
   MemberArticleItemModel.fromJson(Map<String, dynamic> json) {
-    content = json['content'];
-    cover = json['cover'];
-    jumpUrl = json['jump_url'];
-    opusId = json['opus_id'];
-    stat = json['stat'];
+    content = json['content']?.toString() ?? '';
+    cover = json['cover'] is Map ? json['cover'] : <String, dynamic>{};
+    jumpUrl = json['jump_url']?.toString() ?? '';
+    opusId = json['opus_id']?.toString() ?? '';
+    stat = json['stat'] is Map ? json['stat'] : <String, dynamic>{};
   }
 }

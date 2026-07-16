@@ -131,25 +131,69 @@ class MemberHttp {
 
   // 用户动态
   static Future memberDynamic({String? offset, int? mid}) async {
-    var res = await Request().get(Api.memberDynamic, data: {
-      'offset': offset ?? '',
-      'host_mid': mid,
-      'timezone_offset': '-480',
-      'features': 'itemOpusStyle',
-    });
-    if (res.data['code'] == 0) {
-      return {
-        'status': true,
-        'data': DynamicsDataModel.fromJson(res.data['data']),
+    try {
+      String dmImgStr = Utils.base64EncodeRandomString(16, 64);
+      String dmCoverImgStr = Utils.base64EncodeRandomString(32, 128);
+      final baseParams = <String, dynamic>{
+        'offset': offset ?? '',
+        'host_mid': mid,
+        'timezone_offset': '-480',
+        'platform': 'web',
+        'features': 'itemOpusStyle,listOnlyfans,opusBigCover,'
+            'onlyfansVote,forwardListHidden,decorationCard,'
+            'commentsNewVersion,onlyfansAssetsV2,ugcDelete,onlyfansQaCard',
+        'web_location': 333.1387,
+        'dm_img_switch': 0,
+        'dm_img_list': '[]',
+        'dm_img_str': dmImgStr.substring(0, dmImgStr.length - 2),
+        'dm_cover_img_str':
+            dmCoverImgStr.substring(0, dmCoverImgStr.length - 2),
+        'dm_img_inter': '{"ds":[],"wh":[0,0,0],"of":[0,0,0]}',
       };
-    } else {
+      Map<String, dynamic> params = Map<String, dynamic>.from(baseParams);
+      try {
+        params = await WbiSign().makSign(params);
+      } catch (_) {
+        // 已登录时 SESSDATA 即可鉴权；WBI 密钥暂时获取失败时继续请求。
+      }
+      var res = await Request().get(
+        Api.memberDynamic,
+        data: params,
+        extra: {'ua': 'pc'},
+      );
+      final body = res.data;
+      if (body is Map && body['code'] == 0 && body['data'] is Map) {
+        final data = DynamicsDataModel.fromJson(
+          Map<String, dynamic>.from(body['data'] as Map),
+        );
+        if (data.rawItemCount > 0 && (data.items ?? []).isEmpty) {
+          return {
+            'status': false,
+            'data': data,
+            'msg': '动态接口返回了 ${data.rawItemCount} 条数据，但全部解析失败\n'
+                '${data.parseErrors.join('\n')}',
+          };
+        }
+        return {
+          'status': true,
+          'data': data,
+        };
+      }
       Map errMap = {
         -352: '风控校验失败，请检查登录状态',
       };
       return {
         'status': false,
         'data': [],
-        'msg': errMap[res.data['code']] ?? res.data['message'],
+        'msg': '用户动态请求失败\nAPI code: ${body is Map ? body['code'] : '未知'}\n'
+            '信息: ${body is Map ? (errMap[body['code']] ?? body['message']) : body}',
+        'code': body is Map ? body['code'] : null,
+      };
+    } catch (error) {
+      return {
+        'status': false,
+        'data': [],
+        'msg': '用户动态数据处理异常\n${error.runtimeType}: $error',
       };
     }
   }
@@ -269,21 +313,35 @@ class MemberHttp {
 
   // 获取uo专栏
   static Future getMemberSeasons(int? mid, int? pn, int? ps) async {
-    var res = await Request().get(Api.getMemberSeasonsApi, data: {
-      'mid': mid,
-      'page_num': pn,
-      'page_size': ps,
-    });
-    if (res.data['code'] == 0) {
-      return {
-        'status': true,
-        'data': MemberSeasonsDataModel.fromJson(res.data['data']['items_lists'])
-      };
-    } else {
+    try {
+      var res = await Request().get(Api.getMemberSeasonsApi, data: {
+        'mid': mid,
+        'page_num': pn,
+        'page_size': ps,
+      });
+      final body = res.data;
+      final rawData = body is Map ? body['data'] : null;
+      final itemLists = rawData is Map ? rawData['items_lists'] : null;
+      if (body is Map && body['code'] == 0 && itemLists is Map) {
+        return {
+          'status': true,
+          'data': MemberSeasonsDataModel.fromJson(
+            Map<String, dynamic>.from(itemLists),
+          ),
+        };
+      }
       return {
         'status': false,
         'data': [],
-        'msg': res.data['message'],
+        'msg': '合集请求失败\nAPI code: ${body is Map ? body['code'] : '未知'}\n'
+            '信息: ${body is Map ? body['message'] : body}',
+        'code': body is Map ? body['code'] : null,
+      };
+    } catch (error) {
+      return {
+        'status': false,
+        'data': [],
+        'msg': '合集数据处理异常\n${error.runtimeType}: $error',
       };
     }
   }
@@ -379,7 +437,11 @@ class MemberHttp {
           'data': MemberSeasonsList.fromJson(res.data['data'])
         };
       } catch (err) {
-        print(err);
+        return {
+          'status': false,
+          'data': [],
+          'msg': '合集详情数据处理异常\n${err.runtimeType}: $err',
+        };
       }
     } else {
       return {
@@ -554,7 +616,11 @@ class MemberHttp {
           'data': MemberSeasonsDataModel.fromJson(res.data['data'])
         };
       } catch (err) {
-        print(err);
+        return {
+          'status': false,
+          'data': [],
+          'msg': '系列详情数据处理异常\n${err.runtimeType}: $err',
+        };
       }
     } else {
       return {
@@ -566,22 +632,35 @@ class MemberHttp {
   }
 
   static Future getWWebid({required int mid}) async {
-    var res = await Request().get('https://space.bilibili.com/$mid/article');
-    String? headContent = parse(res.data).head?.outerHtml;
-    final regex = RegExp(
-        r'<script id="__RENDER_DATA__" type="application/json">(.*?)</script>');
-    if (headContent != null) {
-      final match = regex.firstMatch(headContent);
-      if (match != null && match.groupCount >= 1) {
-        final content = match.group(1);
-        String decodedString = Uri.decodeComponent(content!);
-        Map<String, dynamic> map = jsonDecode(decodedString);
-        return {'status': true, 'data': map['access_id']};
-      } else {
-        return {'status': false, 'data': '请检查登录状态'};
+    try {
+      var res = await Request().get('https://space.bilibili.com/$mid/article');
+      final documentContent = parse(res.data.toString()).outerHtml;
+      final regex = RegExp(
+        r'<script[^>]*id="__RENDER_DATA__"[^>]*>(.*?)</script>',
+        dotAll: true,
+      );
+      if (documentContent.isNotEmpty) {
+        final match = regex.firstMatch(documentContent);
+        if (match != null && match.groupCount >= 1) {
+          final content = match.group(1);
+          String decodedString = Uri.decodeComponent(content!);
+          Map<String, dynamic> map = jsonDecode(decodedString);
+          final accessId = map['access_id'] ?? map['accessId'];
+          if (accessId != null && accessId.toString().isNotEmpty) {
+            return {'status': true, 'data': accessId.toString()};
+          }
+          return {'status': false, 'msg': '专栏页面未返回 access_id'};
+        } else {
+          return {'status': false, 'msg': '专栏页面未找到初始化数据'};
+        }
       }
+      return {'status': false, 'msg': '专栏页面响应为空'};
+    } catch (error) {
+      return {
+        'status': false,
+        'msg': '专栏凭据获取异常\n${error.runtimeType}: $error',
+      };
     }
-    return {'status': false, 'data': '请检查登录状态'};
   }
 
   // 获取用户专栏
@@ -591,32 +670,44 @@ class MemberHttp {
     required String wWebid,
     String? offset,
   }) async {
-    Map params = await WbiSign().makSign({
-      'host_mid': mid,
-      'page': pn,
-      'offset': offset,
-      'web_location': 333.999,
-      'w_webid': wWebid,
-    });
-    var res = await Request().get(Api.opusList, data: {
-      'host_mid': mid,
-      'page': pn,
-      'offset': offset,
-      'web_location': 333.999,
-      'w_webid': wWebid,
-      'w_rid': params['w_rid'],
-      'wts': params['wts'],
-    });
-    if (res.data['code'] == 0) {
-      return {
-        'status': true,
-        'data': MemberArticleDataModel.fromJson(res.data['data'])
-      };
-    } else {
+    try {
+      Map params = await WbiSign().makSign({
+        'host_mid': mid,
+        'page': pn,
+        'offset': offset,
+        'web_location': 333.999,
+        'w_webid': wWebid,
+      });
+      var res = await Request().get(Api.opusList, data: {
+        'host_mid': mid,
+        'page': pn,
+        'offset': offset,
+        'web_location': 333.999,
+        'w_webid': wWebid,
+        'w_rid': params['w_rid'],
+        'wts': params['wts'],
+      });
+      final body = res.data;
+      if (body is Map && body['code'] == 0 && body['data'] is Map) {
+        return {
+          'status': true,
+          'data': MemberArticleDataModel.fromJson(
+            Map<String, dynamic>.from(body['data'] as Map),
+          ),
+        };
+      }
       return {
         'status': false,
         'data': [],
-        'msg': res.data['message'] ?? '请求异常',
+        'msg': '专栏请求失败\nAPI code: ${body is Map ? body['code'] : '未知'}\n'
+            '信息: ${body is Map ? body['message'] : body}',
+        'code': body is Map ? body['code'] : null,
+      };
+    } catch (error) {
+      return {
+        'status': false,
+        'data': [],
+        'msg': '专栏数据处理异常\n${error.runtimeType}: $error',
       };
     }
   }

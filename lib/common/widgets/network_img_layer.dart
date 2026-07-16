@@ -37,8 +37,12 @@ class NetworkImgLayer extends StatelessWidget {
     if (src == '' || src == null) {
       return placeholder(context);
     }
-    final String imageUrl =
-        '${src!.startsWith('//') ? 'https:${src!}' : src!}@${quality ?? defaultImgQuality}q.webp';
+    final String normalizedUrl = src!.startsWith('//') ? 'https:${src!}' : src!;
+    // 头像不再强制转成低质量 WebP。低质量 CDN 转码与低质量缩放叠加时，
+    // 部分设备会显示白块或混色；原图仍会通过 memCacheWidth/Height 降采样。
+    final String imageUrl = type == 'avatar' || normalizedUrl.contains('@')
+        ? normalizedUrl
+        : '$normalizedUrl@${quality ?? defaultImgQuality}q.webp';
     int? memCacheWidth, memCacheHeight;
     double aspectRatio = (width / height).toDouble();
 
@@ -86,7 +90,8 @@ class NetworkImgLayer extends StatelessWidget {
                   fadeOutDuration ?? const Duration(milliseconds: 120),
               fadeInDuration:
                   fadeInDuration ?? const Duration(milliseconds: 120),
-              filterQuality: FilterQuality.low,
+              filterQuality:
+                  type == 'avatar' ? FilterQuality.medium : FilterQuality.low,
               errorWidget: (BuildContext context, String url, Object error) =>
                   placeholder(context),
               placeholder: (BuildContext context, String url) =>
@@ -102,7 +107,10 @@ class NetworkImgLayer extends StatelessWidget {
       height: height,
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.onInverseSurface.withOpacity(0.4),
+        color: Theme.of(context)
+            .colorScheme
+            .onInverseSurface
+            .withValues(alpha: 0.4),
         borderRadius: BorderRadius.circular(type == 'avatar'
             ? 50
             : type == 'emote'
@@ -118,6 +126,7 @@ class NetworkImgLayer extends StatelessWidget {
                     : 'assets/images/loading.png',
                 width: width,
                 height: height,
+                fit: BoxFit.cover,
                 cacheWidth: width.cacheSize(context),
                 cacheHeight: height.cacheSize(context),
               ),

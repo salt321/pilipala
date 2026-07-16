@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:developer' as developer;
+
 import 'package:hive/hive.dart';
 import 'package:pilipala/models/search/all.dart';
 import 'package:pilipala/utils/wbi_sign.dart';
@@ -12,6 +14,65 @@ import 'index.dart';
 
 class SearchHttp {
   static Box setting = GStrorage.setting;
+
+  static String _responseShape(dynamic data) {
+    if (data is Map) {
+      return 'Map(keys: ${data.keys.take(12).join(', ')})';
+    }
+    if (data is List) {
+      return 'List(length: ${data.length})';
+    }
+    if (data is String) {
+      return 'String(length: ${data.length})';
+    }
+    return data.runtimeType.toString();
+  }
+
+  static String _responsePreview(dynamic data) {
+    final String value = data?.toString() ?? 'null';
+    const int maxLength = 800;
+    return value.length <= maxLength
+        ? value
+        : '${value.substring(0, maxLength)}…';
+  }
+
+  static Map<String, dynamic> _searchFailure({
+    required String stage,
+    required SearchType searchType,
+    required int page,
+    dynamic response,
+    Object? error,
+    StackTrace? stackTrace,
+  }) {
+    final dynamic body = response?.data;
+    final int? httpStatus = response?.statusCode;
+    final dynamic apiCode = body is Map ? body['code'] : null;
+    final dynamic apiMessage = body is Map ? body['message'] : null;
+    final dynamic requestUri = response?.requestOptions?.uri;
+    final String detail = <String>[
+      '搜索请求失败（$stage）',
+      '接口: ${Api.searchByType}',
+      '类型: ${searchType.type}，页码: $page',
+      if (requestUri != null && requestUri.toString().isNotEmpty)
+        '请求地址: $requestUri',
+      if (httpStatus != null) 'HTTP 状态: $httpStatus',
+      if (apiCode != null) 'Bilibili API code: $apiCode',
+      if (apiMessage != null && apiMessage.toString().trim().isNotEmpty)
+        'API 信息: $apiMessage',
+      '响应结构: ${_responseShape(body)}',
+      '响应内容: ${_responsePreview(body)}',
+      if (error != null) '异常: ${error.runtimeType}: $error',
+    ].join('\n');
+
+    developer.log(
+      detail,
+      name: 'SearchHttp.searchByType',
+      error: error,
+      stackTrace: stackTrace,
+    );
+    return {'status': false, 'data': [], 'msg': detail};
+  }
+
   static Future hotSearchList() async {
     var res = await Request().get(Api.hotSearchList);
     if (res.data is String) {
@@ -72,24 +133,55 @@ class SearchHttp {
   static Future searchByType({
     required SearchType searchType,
     required String keyword,
-    required page,
+    required int page,
     String? order,
     int? duration,
     int? tids,
   }) async {
-    var reqData = {
+    final Map<String, dynamic> reqData = <String, dynamic>{
       'search_type': searchType.type,
       'keyword': keyword,
-      // 'order_sort': 0,
-      // 'user_type': 0,
       'page': page,
+      'web_location': 1430654,
       if (order != null) 'order': order,
       if (duration != null) 'duration': duration,
       if (tids != null && tids != -1) 'tids': tids,
     };
-    var res = await Request().get(Api.searchByType, data: reqData);
-    if (res.data['code'] == 0) {
-      if (res.data['data']['numPages'] == 0) {
+    dynamic res;
+    try {
+      // search/type 是 WBI 接口。未签名请求目前会被 Bilibili 以风控错误拒绝。
+      final Map<String, dynamic> signedParams =
+          await WbiSign().makSign(Map<String, dynamic>.from(reqData));
+      res = await Request().get(Api.searchByType, data: signedParams);
+    } catch (error, stackTrace) {
+      return _searchFailure(
+        stage: 'WBI 签名或网络请求异常',
+        searchType: searchType,
+        page: page,
+        response: res,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+    final dynamic body = res.data;
+    if (body is! Map) {
+      return _searchFailure(
+        stage: '响应格式异常',
+        searchType: searchType,
+        page: page,
+        response: res,
+      );
+    }
+    if (body['code'] == 0) {
+      if (body['data'] is! Map) {
+        return _searchFailure(
+          stage: '缺少 data 字段',
+          searchType: searchType,
+          page: page,
+          response: res,
+        );
+      }
+      if (body['data']['numPages'] == 0) {
         // 我想返回数据，使得可以通过data.list 取值，结果为[]
         return {'status': true, 'data': Data()};
       }
@@ -99,38 +191,46 @@ class SearchHttp {
           case SearchType.video:
             List<int> blackMidsList =
                 setting.get(SettingBoxKey.blackMidsList, defaultValue: [-1]);
-            for (var i in res.data['data']['result']) {
+            for (var i in body['data']['result']) {
               // 屏蔽推广和拉黑用户
               i['available'] = !blackMidsList.contains(i['mid']);
             }
-            data = SearchVideoModel.fromJson(res.data['data']);
+            data = SearchVideoModel.fromJson(body['data']);
             break;
           case SearchType.live_room:
-            data = SearchLiveModel.fromJson(res.data['data']);
+            data = SearchLiveModel.fromJson(body['data']);
             break;
           case SearchType.bili_user:
-            data = SearchUserModel.fromJson(res.data['data']);
+            data = SearchUserModel.fromJson(body['data']);
             break;
           case SearchType.media_bangumi:
-            data = SearchMBangumiModel.fromJson(res.data['data']);
+            data = SearchMBangumiModel.fromJson(body['data']);
             break;
           case SearchType.article:
-            data = SearchArticleModel.fromJson(res.data['data']);
+            data = SearchArticleModel.fromJson(body['data']);
             break;
         }
         return {
           'status': true,
           'data': data,
         };
-      } catch (err) {
-        print(err);
+      } catch (error, stackTrace) {
+        return _searchFailure(
+          stage: '响应解析失败',
+          searchType: searchType,
+          page: page,
+          response: res,
+          error: error,
+          stackTrace: stackTrace,
+        );
       }
     } else {
-      return {
-        'status': false,
-        'data': [],
-        'msg': res.data['message'],
-      };
+      return _searchFailure(
+        stage: body.containsKey('code') ? 'API 拒绝请求' : '网络请求失败',
+        searchType: searchType,
+        page: page,
+        response: res,
+      );
     }
   }
 

@@ -33,8 +33,13 @@ class FavController extends GetxController {
     if (userInfo == null) {
       return {'status': false, 'msg': '账号未登录', 'code': -101};
     }
-    if (!hasMore.value) {
-      return;
+    if (!hasMore.value && type != 'init') {
+      return {'status': true, 'data': favFolderData.value};
+    }
+    if (type == 'init') {
+      currentPage = 1;
+      hasMore.value = true;
+      favFolderList.clear();
     }
     var res = await UserHttp.userfavFolder(
       pn: currentPage,
@@ -44,14 +49,14 @@ class FavController extends GetxController {
     if (res['status']) {
       if (type == 'init') {
         favFolderData.value = res['data'];
-        favFolderList.value = res['data'].list;
+        favFolderList.value = res['data'].list ?? [];
       } else {
-        if (res['data'].list.isNotEmpty) {
-          favFolderList.addAll(res['data'].list);
+        if ((res['data'].list ?? []).isNotEmpty) {
+          favFolderList.addAll(res['data'].list ?? []);
           favFolderData.update((val) {});
         }
       }
-      hasMore.value = res['data'].hasMore;
+      hasMore.value = res['data'].hasMore ?? false;
       currentPage++;
     } else {
       SmartDialog.showToast(res['msg']);

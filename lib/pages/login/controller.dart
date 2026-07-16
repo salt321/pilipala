@@ -27,7 +27,10 @@ class LoginPageController extends GetxController {
 
   RxInt currentIndex = 0.obs;
 
-  final Gt3FlutterPlugin captcha = Gt3FlutterPlugin();
+  // 不要在进入页面时初始化 Android 极验 SDK。旧 SDK 在部分系统上会
+  // 发生原生崩溃；仅当用户实际触发旧密码/短信验证流程时才创建。
+  Gt3FlutterPlugin? _captcha;
+  Gt3FlutterPlugin get captcha => _captcha ??= Gt3FlutterPlugin();
 
   // 倒计时60s
   RxInt seconds = 60.obs;
@@ -175,7 +178,7 @@ class LoginPageController extends GetxController {
         validate: captchaData.validate!,
         seccode: captchaData.seccode!,
       );
-      print(res);
+      debugPrint('App SMS response: $res');
     });
   }
 

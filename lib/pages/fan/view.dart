@@ -59,13 +59,28 @@ class _FansPageState extends State<FansPage> {
         ),
       ),
       body: RefreshIndicator(
-        onRefresh: () async => await _fansController.queryFans('init'),
+        onRefresh: () async {
+          final Future<dynamic> future = _fansController.queryFans('init');
+          setState(() => _futureBuilderFuture = future);
+          await future;
+        },
         child: FutureBuilder(
           future: _futureBuilderFuture,
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.done) {
-              var data = snapshot.data;
-              if (data['status']) {
+              if (snapshot.hasError) {
+                return CustomScrollView(
+                  slivers: [
+                    HttpError(
+                      errMsg: '粉丝页面异常\n'
+                          '${snapshot.error.runtimeType}: ${snapshot.error}',
+                      fn: _reload,
+                    ),
+                  ],
+                );
+              }
+              final dynamic data = snapshot.data;
+              if (data is Map && data['status'] == true) {
                 List<FansItemModel> list = _fansController.fansList;
                 return Obx(
                   () => list.isNotEmpty
@@ -107,22 +122,26 @@ class _FansPageState extends State<FansPage> {
                   physics: const NeverScrollableScrollPhysics(),
                   slivers: [
                     HttpError(
-                      errMsg: data['msg'],
-                      fn: () {
-                        _futureBuilderFuture =
-                            _fansController.queryFans('init');
-                      },
+                      errMsg: data is Map
+                          ? data['msg']?.toString()
+                          : '粉丝列表没有返回有效数据',
+                      fn: _reload,
                     )
                   ],
                 );
               }
             } else {
-              // 骨架屏
-              return const SizedBox();
+              return const Center(child: CircularProgressIndicator());
             }
           },
         ),
       ),
     );
+  }
+
+  void _reload() {
+    setState(() {
+      _futureBuilderFuture = _fansController.queryFans('init');
+    });
   }
 }

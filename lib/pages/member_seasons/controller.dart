@@ -32,6 +32,7 @@ class MemberSeasonsController extends GetxController {
   Future getSeasonDetail(type) async {
     if (type == 'onRefresh') {
       pn = 1;
+      seasonsList.clear();
     }
     var res = await MemberHttp.getSeasonDetail(
       mid: mid,
@@ -41,8 +42,8 @@ class MemberSeasonsController extends GetxController {
       sortReverse: false,
     );
     if (res['status']) {
-      seasonsList.addAll(res['data'].archives);
-      page = res['data'].page;
+      seasonsList.addAll(res['data'].archives ?? []);
+      page = res['data'].page ?? <String, dynamic>{};
       pn += 1;
     }
     return res;
@@ -52,16 +53,17 @@ class MemberSeasonsController extends GetxController {
   Future getSeriesDetail(type) async {
     if (type == 'onRefresh') {
       pn = 1;
+      seasonsList.clear();
     }
     var res = await MemberHttp.getSeriesDetail(
       mid: mid,
       seriesId: seriesId!,
       pn: pn,
-      currentMid: 17340771,
+      currentMid: mid,
     );
     if (res['status']) {
-      seasonsList.addAll(res['data'].seriesList);
-      page = res['data'].page;
+      seasonsList.addAll(res['data'].seriesList ?? []);
+      page = res['data'].page ?? <String, dynamic>{};
       pn += 1;
     }
     return res;

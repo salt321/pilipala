@@ -206,8 +206,11 @@ class _MemberPageState extends State<MemberPage>
                     /// 合集
                     Obx(
                       () => ListTile(
+                          onTap: _memberController.pushSeasonsPage,
                           title: Text(
-                              '${_memberController.isOwner.value ? '我' : 'Ta'}的合集')),
+                              '${_memberController.isOwner.value ? '我' : 'Ta'}的合集'),
+                          trailing: const Icon(Icons.arrow_forward_outlined,
+                              size: 19)),
                     ),
                     MediaQuery.removePadding(
                       removeTop: true,
@@ -218,22 +221,28 @@ class _MemberPageState extends State<MemberPage>
                         builder: (context, snapshot) {
                           if (snapshot.connectionState ==
                               ConnectionState.done) {
-                            if (snapshot.data == null) {
-                              return const SizedBox();
+                            if (snapshot.hasError) {
+                              return commenWidget('合集页面异常：${snapshot.error}');
                             }
-                            if (snapshot.data['status']) {
+                            if (snapshot.data is! Map) {
+                              return commenWidget('合集接口没有返回有效数据');
+                            }
+                            if (snapshot.data['status'] == true) {
                               Map data = snapshot.data as Map;
-                              if (data['data'].seasonsList.isEmpty) {
+                              if ((data['data'].seasonsList ?? []).isEmpty) {
                                 return commenWidget('用户没有设置合集');
                               } else {
                                 return MemberSeasonsPanel(data: data['data']);
                               }
                             } else {
-                              // 请求错误
-                              return const SizedBox();
+                              return commenWidget(
+                                  snapshot.data['msg']?.toString() ?? '合集请求异常');
                             }
                           } else {
-                            return const SizedBox();
+                            return const Padding(
+                              padding: EdgeInsets.all(24),
+                              child: CircularProgressIndicator(),
+                            );
                           }
                         },
                       ),

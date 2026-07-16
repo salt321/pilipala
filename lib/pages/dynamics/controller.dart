@@ -52,7 +52,7 @@ class DynamicsController extends GetxController {
   RxInt initialValue = 0.obs;
   Box userInfoCache = GStrorage.userInfo;
   RxBool userLogin = false.obs;
-  var userInfo;
+  dynamic userInfo;
   RxBool isLoadingDynamic = false.obs;
   Box setting = GStrorage.setting;
 
@@ -78,22 +78,34 @@ class DynamicsController extends GetxController {
       return;
     }
     isLoadingDynamic.value = true;
-    var res = await DynamicsHttp.followDynamic(
-      page: type == 'init' ? 1 : page,
-      type: dynamicsType.value.values,
-      offset: offset,
-      mid: mid.value,
-    );
-    isLoadingDynamic.value = false;
+    late final dynamic res;
+    try {
+      res = await DynamicsHttp.followDynamic(
+        page: type == 'init' ? 1 : page,
+        type: dynamicsType.value.values,
+        offset: offset,
+        mid: mid.value,
+      );
+    } catch (error) {
+      return {
+        'status': false,
+        'data': [],
+        'msg': '动态加载异常\n${error.runtimeType}: $error',
+      };
+    } finally {
+      isLoadingDynamic.value = false;
+    }
     if (res['status']) {
-      if (type == 'onLoad' && res['data'].items.isEmpty) {
+      final List<DynamicItemModel> items =
+          List<DynamicItemModel>.from(res['data'].items ?? const []);
+      if (type == 'onLoad' && items.isEmpty) {
         SmartDialog.showToast('没有更多了');
         return;
       }
       if (type == 'init') {
-        dynamicsList.value = res['data'].items;
+        dynamicsList.value = items;
       } else {
-        dynamicsList.addAll(res['data'].items);
+        dynamicsList.addAll(items);
       }
       offset = res['data'].offset;
       page++;

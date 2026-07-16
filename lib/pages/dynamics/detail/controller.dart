@@ -30,11 +30,14 @@ class DynamicDetailController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    item = Get.arguments['item'];
-    floor = Get.arguments['floor'];
+    final arguments = Get.arguments is Map ? Get.arguments as Map : null;
+    item = arguments?['item'];
+    floor = arguments?['floor'];
     if (floor == 1) {
-      acount.value =
-          int.parse(item!.modules!.moduleStat!.comment!.count ?? '0');
+      acount.value = int.tryParse(
+            item?.modules?.moduleStat?.comment?.count?.toString() ?? '0',
+          ) ??
+          0;
     }
     int deaultReplySortIndex =
         setting.get(SettingBoxKey.replySortType, defaultValue: 0);
@@ -48,6 +51,14 @@ class DynamicDetailController extends GetxController {
   }
 
   Future queryReplyList({reqType = 'init'}) async {
+    if ((oid ?? 0) <= 0 || type == null) {
+      isLoadingMore = false;
+      return <String, dynamic>{
+        'status': false,
+        'code': -1,
+        'msg': '该动态没有可用的评论标识',
+      };
+    }
     if (reqType == 'init') {
       currentPage = 0;
     }
@@ -85,7 +96,7 @@ class DynamicDetailController extends GetxController {
         replyList.addAll(replies);
       }
     }
-    replyReqCode.value = res['code'];
+    replyReqCode.value = (res['code'] as num?)?.toInt() ?? -1;
     isLoadingMore = false;
     return res;
   }
@@ -100,7 +111,6 @@ class DynamicDetailController extends GetxController {
       case ReplySortType.like:
         _sortType = ReplySortType.time;
         break;
-      default:
     }
     sortTypeTitle.value = _sortType.titles;
     sortTypeLabel.value = _sortType.labels;

@@ -5,6 +5,11 @@ import '../models/dynamics/up.dart';
 import 'index.dart';
 
 class DynamicsHttp {
+  static const String dynamicFeatures =
+      'itemOpusStyle,listOnlyfans,opusBigCover,onlyfansVote,'
+      'forwardListHidden,decorationCard,commentsNewVersion,'
+      'onlyfansAssetsV2,ugcDelete,onlyfansQaCard';
+
   static Future followDynamic({
     String? type,
     int? page,
@@ -16,49 +21,75 @@ class DynamicsHttp {
       'page': page ?? 1,
       'timezone_offset': '-480',
       'offset': page == 1 ? '' : offset,
-      'features': 'itemOpusStyle'
+      'features': dynamicFeatures,
+      'platform': 'web',
+      'web_location': 333.1365,
     };
     if (mid != -1) {
       data['host_mid'] = mid;
       data.remove('timezone_offset');
     }
-    var res = await Request().get(Api.followDynamic, data: data);
-    if (res.data['code'] == 0) {
-      try {
+    try {
+      final dynamic res = await Request().get(
+        Api.followDynamic,
+        data: data,
+        extra: {'ua': 'pc'},
+      );
+      final dynamic body = res.data;
+      if (body is Map && body['code'] == 0 && body['data'] is Map) {
+        final data = DynamicsDataModel.fromJson(
+            Map<String, dynamic>.from(body['data'] as Map));
+        if (data.rawItemCount > 0 && (data.items ?? []).isEmpty) {
+          return {
+            'status': false,
+            'data': data,
+            'msg': '动态接口返回了 ${data.rawItemCount} 条数据，但全部解析失败\n'
+                '${data.parseErrors.join('\n')}',
+          };
+        }
         return {
           'status': true,
-          'data': DynamicsDataModel.fromJson(res.data['data']),
-        };
-      } catch (err) {
-        print(err);
-        return {
-          'status': false,
-          'data': [],
-          'msg': err.toString(),
+          'data': data,
         };
       }
-    } else {
       return {
         'status': false,
         'data': [],
-        'msg': res.data['message'],
-        'code': res.data['code'],
+        'msg': '动态请求失败\n'
+            'API code: ${body is Map ? body['code'] : '未知'}\n'
+            '信息: ${body is Map ? body['message'] : body}',
+        'code': body is Map ? body['code'] : null,
+      };
+    } catch (error) {
+      return {
+        'status': false,
+        'data': [],
+        'msg': '动态数据处理异常\n${error.runtimeType}: $error',
       };
     }
   }
 
   static Future followUp() async {
-    var res = await Request().get(Api.followUp);
-    if (res.data['code'] == 0) {
-      return {
-        'status': true,
-        'data': FollowUpModel.fromJson(res.data['data']),
-      };
-    } else {
+    try {
+      final dynamic res = await Request().get(Api.followUp);
+      final dynamic body = res.data;
+      if (body is Map && body['code'] == 0 && body['data'] is Map) {
+        return {
+          'status': true,
+          'data': FollowUpModel.fromJson(
+              Map<String, dynamic>.from(body['data'] as Map)),
+        };
+      }
       return {
         'status': false,
         'data': [],
-        'msg': res.data['message'],
+        'msg': body is Map ? body['message'] : '动态用户列表响应异常',
+      };
+    } catch (error) {
+      return {
+        'status': false,
+        'data': [],
+        'msg': '动态用户列表处理异常\n${error.runtimeType}: $error',
       };
     }
   }

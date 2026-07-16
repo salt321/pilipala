@@ -10,7 +10,7 @@ class MemberSeasonsDataModel {
   List<MemberArchiveItem>? seriesList;
 
   MemberSeasonsDataModel.fromJson(Map<String, dynamic> json) {
-    page = json['page'];
+    page = json['page'] is Map ? json['page'] : <String, dynamic>{};
     var tempList1 = json['seasons_list'] != null
         ? json['seasons_list']
             .map<MemberSeasonsList>((e) => MemberSeasonsList.fromJson(e))
@@ -50,8 +50,10 @@ class MemberSeasonsList {
             .map<MemberArchiveItem>((e) => MemberArchiveItem.fromJson(e))
             .toList()
         : [];
-    meta = MamberMeta.fromJson(json['meta']);
-    page = json['page'];
+    meta = json['meta'] is Map
+        ? MamberMeta.fromJson(Map<String, dynamic>.from(json['meta']))
+        : MamberMeta();
+    page = json['page'] is Map ? json['page'] : <String, dynamic>{};
   }
 }
 
@@ -86,8 +88,8 @@ class MemberArchiveItem {
     pic = json['pic'];
     cover = json['pic'];
     pubdate = json['pubdate'];
-    view = json['stat']['view'];
-    title = json['title'];
+    view = json['stat'] is Map ? (json['stat']['view'] as num?)?.toInt() : 0;
+    title = json['title']?.toString() ?? '';
   }
 }
 
@@ -115,14 +117,14 @@ class MamberMeta {
   int? category;
 
   MamberMeta.fromJson(Map<String, dynamic> json) {
-    cover = json['cover'];
-    description = json['description'];
-    mid = json['mid'];
-    name = json['name'];
-    ptime = json['ptime'];
-    seasonId = json['season_id'];
-    total = json['total'];
-    seriesId = json['series_id'];
-    category = json['category'];
+    cover = json['cover']?.toString() ?? '';
+    description = json['description']?.toString() ?? '';
+    mid = (json['mid'] as num?)?.toInt();
+    name = json['name']?.toString() ?? '';
+    ptime = (json['ptime'] as num?)?.toInt();
+    seasonId = (json['season_id'] as num?)?.toInt();
+    total = (json['total'] as num?)?.toInt() ?? 0;
+    seriesId = (json['series_id'] as num?)?.toInt();
+    category = (json['category'] as num?)?.toInt() ?? 0;
   }
 }

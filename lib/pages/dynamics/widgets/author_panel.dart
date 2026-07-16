@@ -3,86 +3,97 @@ import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
 import 'package:pilipala/common/widgets/network_img_layer.dart';
 import 'package:pilipala/http/user.dart';
+import 'package:pilipala/models/dynamics/result.dart';
 import 'package:pilipala/utils/feed_back.dart';
 import 'package:pilipala/utils/utils.dart';
 
 class AuthorPanel extends StatelessWidget {
-  final dynamic item;
+  final DynamicItemModel item;
   const AuthorPanel({super.key, required this.item});
 
   @override
   Widget build(BuildContext context) {
-    String heroTag = Utils.makeHeroTag(item.modules.moduleAuthor.mid);
+    final author = item.modules?.moduleAuthor;
+    final mid = author?.mid;
+    final heroTag = Utils.makeHeroTag(mid ?? item.idStr ?? 'unknown');
+    final vipStatus = (author?.vip?['status'] as num?)?.toInt() ?? 0;
     return Row(
       children: [
         GestureDetector(
           onTap: () {
             // 番剧
-            if (item.modules.moduleAuthor.type == 'AUTHOR_TYPE_PGC') {
+            if (author?.type == 'AUTHOR_TYPE_PGC' || mid == null) {
               return;
             }
             feedBack();
             Get.toNamed(
-              '/member?mid=${item.modules.moduleAuthor.mid}',
-              arguments: {
-                'face': item.modules.moduleAuthor.face,
-                'heroTag': heroTag
-              },
+              '/member?mid=$mid',
+              arguments: {'face': author?.face, 'heroTag': heroTag},
             );
           },
           child: Hero(
             tag: heroTag,
-            child: NetworkImgLayer(
-              width: 40,
-              height: 40,
-              type: 'avatar',
-              src: item.modules.moduleAuthor.face,
-            ),
+            child: author?.face?.isNotEmpty == true
+                ? NetworkImgLayer(
+                    width: 40,
+                    height: 40,
+                    type: 'avatar',
+                    src: author!.face,
+                  )
+                : const CircleAvatar(
+                    radius: 20,
+                    child: Icon(Icons.person_outline),
+                  ),
           ),
         ),
         const SizedBox(width: 10),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Text(
-                  item.modules.moduleAuthor.name,
-                  style: TextStyle(
-                    color: item.modules.moduleAuthor!.vip != null &&
-                            item.modules.moduleAuthor!.vip['status'] > 0
-                        ? const Color.fromARGB(255, 251, 100, 163)
-                        : Theme.of(context).colorScheme.onSurface,
-                    fontSize: Theme.of(context).textTheme.titleSmall!.fontSize,
-                  ),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                author?.name?.isNotEmpty == true ? author!.name! : '未知用户',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: vipStatus > 0
+                      ? const Color.fromARGB(255, 251, 100, 163)
+                      : Theme.of(context).colorScheme.onSurface,
+                  fontSize: Theme.of(context).textTheme.titleSmall!.fontSize,
                 ),
-              ],
-            ),
-            DefaultTextStyle.merge(
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.outline,
-                fontSize: Theme.of(context).textTheme.labelSmall!.fontSize,
               ),
-              child: Row(
-                children: [
-                  Text(item.modules.moduleAuthor.pubTime),
-                  if (item.modules.moduleAuthor.pubTime != '' &&
-                      item.modules.moduleAuthor.pubAction != '')
-                    const Text(' '),
-                  Text(item.modules.moduleAuthor.pubAction),
-                ],
-              ),
-            )
-          ],
+              DefaultTextStyle.merge(
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.outline,
+                  fontSize: Theme.of(context).textTheme.labelSmall!.fontSize,
+                ),
+                child: Row(
+                  children: [
+                    Text(author?.pubTime ?? ''),
+                    if (author?.pubTime?.isNotEmpty == true &&
+                        author?.pubAction?.isNotEmpty == true)
+                      const Text(' '),
+                    Flexible(
+                      child: Text(
+                        author?.pubAction ?? '',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            ],
+          ),
         ),
-        const Spacer(),
-        if (item.type == 'DYNAMIC_TYPE_AV')
+        if (item.type == 'DYNAMIC_TYPE_AV' &&
+            item.modules?.moduleDynamic?.major?.archive != null)
           SizedBox(
             width: 32,
             height: 32,
             child: IconButton(
               style: ButtonStyle(
-                padding: MaterialStateProperty.all(EdgeInsets.zero),
+                padding: WidgetStateProperty.all(EdgeInsets.zero),
               ),
               onPressed: () {
                 showModalBottomSheet(

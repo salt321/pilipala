@@ -35,6 +35,7 @@ import '../pages/media/index.dart';
 import '../pages/member/index.dart';
 import '../pages/member_archive/index.dart';
 import '../pages/member_coin/index.dart';
+import '../pages/member_collections/index.dart';
 import '../pages/member_dynamics/index.dart';
 import '../pages/member_like/index.dart';
 import '../pages/member_search/index.dart';
@@ -156,6 +157,9 @@ class Routes {
         name: '/memberArchive', page: () => const MemberArchivePage()),
     // 用户最近投币
     CustomGetPage(name: '/memberCoin', page: () => const MemberCoinPage()),
+    // 用户合集
+    CustomGetPage(
+        name: '/memberCollections', page: () => const MemberCollectionsPage()),
     // 用户最近喜欢
     CustomGetPage(name: '/memberLike', page: () => const MemberLikePage()),
     // 用户专栏

@@ -33,36 +33,51 @@ class MemberArticleController extends GetxController {
 
   Future getMemberArticle(type) async {
     if (isLoading.value) {
-      return;
+      return {'status': false, 'msg': '专栏正在加载，请稍候'};
+    }
+    if (!hasMore && type == 'onLoad') {
+      return {'status': true, 'data': null};
     }
     isLoading.value = true;
-    if (wWebid == null) {
-      await getWWebid();
-    }
-    if (type == 'init') {
-      pn = 1;
-      articleList.clear();
-    }
-    var res = await MemberHttp.getMemberArticle(
-      mid: mid,
-      pn: pn,
-      offset: offset,
-      wWebid: wWebid!,
-    );
-    if (res['status']) {
-      offset = res['data'].offset;
-      hasMore = res['data'].hasMore!;
+    try {
+      if (wWebid == null) {
+        final credential = await MemberHttp.getWWebid(mid: mid);
+        if (credential['status'] != true) return credential;
+        wWebid = credential['data']?.toString();
+      }
       if (type == 'init') {
-        articleList.value = res['data'].items;
+        pn = 1;
+        offset = null;
+        hasMore = true;
+        articleList.clear();
       }
-      if (type == 'onLoad') {
-        articleList.addAll(res['data'].items);
+      var res = await MemberHttp.getMemberArticle(
+        mid: mid,
+        pn: pn,
+        offset: offset,
+        wWebid: wWebid!,
+      );
+      if (res['status']) {
+        final items = res['data'].items ?? <MemberArticleItemModel>[];
+        offset = res['data'].offset;
+        hasMore = res['data'].hasMore ?? false;
+        if (type == 'init') {
+          articleList.assignAll(items);
+        } else {
+          articleList.addAll(items);
+        }
+        pn += 1;
+      } else {
+        SmartDialog.showToast(res['msg']?.toString() ?? '专栏请求异常');
       }
-      pn += 1;
-    } else {
-      SmartDialog.showToast(res['msg']);
+      return res;
+    } catch (error) {
+      return {
+        'status': false,
+        'msg': '专栏页面处理异常\n${error.runtimeType}: $error',
+      };
+    } finally {
+      isLoading.value = false;
     }
-    isLoading.value = false;
-    return res;
   }
 }

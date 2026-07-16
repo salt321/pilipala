@@ -6,6 +6,7 @@ import 'package:pilipala/http/user.dart';
 import 'package:pilipala/models/common/theme_type.dart';
 import 'package:pilipala/models/user/info.dart';
 import 'package:pilipala/models/user/stat.dart';
+import 'package:pilipala/utils/route_push.dart';
 import 'package:pilipala/utils/storage.dart';
 
 class MineController extends GetxController {
@@ -33,7 +34,9 @@ class MineController extends GetxController {
 
   onLogin() async {
     if (!userLogin.value) {
-      Get.toNamed('/loginPage', preventDuplicates: false);
+      // 旧登录页会在打开时立即初始化已过时的极验原生 SDK，部分
+      // Android 版本会因此直接终止进程。统一使用 Bilibili 官方 H5 登录。
+      await RoutePush.loginPush();
     } else {
       int mid = userInfo.value.mid!;
       String face = userInfo.value.face!;
