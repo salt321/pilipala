@@ -432,6 +432,7 @@ class VideoIntroController extends GetxController {
       ..oid.value = aid ?? IdUtils.bv2av(bvid)
       ..cid.value = cid
       ..danmakuCid.value = cid
+      ..activePlaylistBvid.value = bvid
       ..cover.value = cover ?? ''
       ..queryVideoUrl(
         resumeHistoryProgress:

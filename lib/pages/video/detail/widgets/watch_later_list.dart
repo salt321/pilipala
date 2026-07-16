@@ -16,9 +16,9 @@ class MediaListPanel extends StatefulWidget {
   const MediaListPanel({
     this.sheetHeight,
     required this.mediaList,
+    required this.activeBvid,
     this.changeMediaList,
     this.panelTitle,
-    this.bvid,
     this.mediaId,
     this.hasMore = false,
     this.playlistLocked = true,
@@ -29,10 +29,10 @@ class MediaListPanel extends StatefulWidget {
   });
 
   final double? sheetHeight;
-  final List<MediaVideoItemModel> mediaList;
+  final RxList<MediaVideoItemModel> mediaList;
+  final RxString activeBvid;
   final Function? changeMediaList;
   final String? panelTitle;
-  final String? bvid;
   final int? mediaId;
   final bool hasMore;
   final bool playlistLocked;
@@ -45,7 +45,6 @@ class MediaListPanel extends StatefulWidget {
 }
 
 class _MediaListPanelState extends State<MediaListPanel> {
-  RxList<MediaVideoItemModel> mediaList = <MediaVideoItemModel>[].obs;
   final ScrollController _scrollController = ScrollController();
   late bool _playlistLocked;
   late bool _resumeProgress;
@@ -55,7 +54,6 @@ class _MediaListPanelState extends State<MediaListPanel> {
     super.initState();
     _playlistLocked = widget.playlistLocked;
     _resumeProgress = widget.resumeProgress;
-    mediaList.value = widget.mediaList;
     _scrollController.addListener(() {
       if (_scrollController.position.pixels >=
           _scrollController.position.maxScrollExtent - 200) {
@@ -74,11 +72,11 @@ class _MediaListPanelState extends State<MediaListPanel> {
       type: 3,
       bizId: widget.mediaId!,
       ps: 20,
-      oid: mediaList.last.id,
+      oid: widget.mediaList.last.id,
     );
     if (res['status']) {
       if (res['data'].isNotEmpty) {
-        mediaList.addAll(res['data']);
+        widget.mediaList.addAll(res['data']);
       }
     } else {
       SmartDialog.showToast(res['msg']);
@@ -153,9 +151,9 @@ class _MediaListPanelState extends State<MediaListPanel> {
               child: Obx(
                 () => ListView.builder(
                   controller: _scrollController,
-                  itemCount: mediaList.length,
+                  itemCount: widget.mediaList.length,
                   itemBuilder: ((context, index) {
-                    var item = mediaList[index];
+                    var item = widget.mediaList[index];
                     return InkWell(
                       onTap: () async {
                         String bvid = item.bvid!;
@@ -215,18 +213,21 @@ class _MediaListPanelState extends State<MediaListPanel> {
                                         crossAxisAlignment:
                                             CrossAxisAlignment.start,
                                         children: [
-                                          Text(
-                                            item.title as String,
-                                            textAlign: TextAlign.start,
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.w500,
-                                              color: item.bvid == widget.bvid
-                                                  ? Theme.of(context)
-                                                      .colorScheme
-                                                      .primary
-                                                  : null,
+                                          Obx(
+                                            () => Text(
+                                              item.title as String,
+                                              textAlign: TextAlign.start,
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.w500,
+                                                color: item.bvid ==
+                                                        widget.activeBvid.value
+                                                    ? Theme.of(context)
+                                                        .colorScheme
+                                                        .primary
+                                                    : null,
+                                              ),
                                             ),
                                           ),
                                           const Spacer(),

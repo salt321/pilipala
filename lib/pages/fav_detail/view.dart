@@ -86,9 +86,11 @@ class _FavDetailPageState extends State<FavDetailPage> {
                               style: Theme.of(context).textTheme.titleMedium,
                             ),
                           ),
-                          Text(
-                            '共${_favDetailController.mediaCount}条视频',
-                            style: Theme.of(context).textTheme.labelMedium,
+                          Obx(
+                            () => Text(
+                              '共${_favDetailController.mediaCount}条视频',
+                              style: Theme.of(context).textTheme.labelMedium,
+                            ),
                           )
                         ],
                       )
@@ -99,8 +101,10 @@ class _FavDetailPageState extends State<FavDetailPage> {
             ),
             actions: [
               IconButton(
-                onPressed: () =>
-                    Get.toNamed('/favSearch?searchType=0&mediaId=$mediaId'),
+                onPressed: () async {
+                  await Get.toNamed('/favSearch?searchType=0&mediaId=$mediaId');
+                  await _favDetailController.refreshFavContents();
+                },
                 icon: const Icon(Icons.search_outlined),
               ),
               PopupMenuButton<String>(
@@ -210,26 +214,21 @@ class _FavDetailPageState extends State<FavDetailPage> {
               if (snapshot.connectionState == ConnectionState.done) {
                 Map data = snapshot.data;
                 if (data['status']) {
-                  if (_favDetailController.item!.mediaCount == 0) {
-                    return const NoData();
-                  } else {
-                    List favList = _favDetailController.favList;
-                    return Obx(
-                      () => favList.isEmpty
-                          ? const SliverToBoxAdapter(child: SizedBox())
-                          : SliverList(
-                              delegate:
-                                  SliverChildBuilderDelegate((context, index) {
-                                return FavVideoCardH(
-                                  videoItem: favList[index],
-                                  isOwner: _favDetailController.isOwner,
-                                  callFn: () => _favDetailController
-                                      .onCancelFav(favList[index].id),
-                                );
-                              }, childCount: favList.length),
-                            ),
-                    );
-                  }
+                  return Obx(
+                    () => _favDetailController.favList.isEmpty
+                        ? const NoData()
+                        : SliverList(
+                            delegate:
+                                SliverChildBuilderDelegate((context, index) {
+                              return FavVideoCardH(
+                                videoItem: _favDetailController.favList[index],
+                                isOwner: _favDetailController.isOwner,
+                                callFn: () => _favDetailController.onCancelFav(
+                                    _favDetailController.favList[index].id),
+                              );
+                            }, childCount: _favDetailController.favList.length),
+                          ),
+                  );
                 } else {
                   return HttpError(
                     errMsg: data['msg'],

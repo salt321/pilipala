@@ -67,15 +67,32 @@ class FavDetailController extends GetxController {
     return res;
   }
 
-  onCancelFav(int id) async {
+  Future<dynamic> refreshFavContents() {
+    currentPage = 1;
+    isLoadingMore = false;
+    loadingText.value = '加载中...';
+    return queryUserFavFolderDetail(type: 'init');
+  }
+
+  onCancelFav(int? id) async {
+    if (id == null) return;
     var result = await VideoHttp.favVideo(
         aid: id, addIds: '', delIds: mediaId.toString());
     if (result['status']) {
-      List dataList = favList;
-      for (var i in dataList) {
-        if (i.id == id) {
-          dataList.remove(i);
-          break;
+      final int previousLength = favList.length;
+      favList.removeWhere((item) => item.id == id);
+      if (favList.length != previousLength) {
+        mediaCount.value = (mediaCount.value - 1).clamp(0, mediaCount.value);
+        item?.mediaCount = mediaCount.value;
+        if (Get.isRegistered<FavController>()) {
+          final FavController favController = Get.find<FavController>();
+          for (final folder in favController.favFolderList) {
+            if (folder.id == mediaId) {
+              folder.mediaCount = mediaCount.value;
+              break;
+            }
+          }
+          favController.favFolderList.refresh();
         }
       }
       SmartDialog.showToast('取消收藏');
@@ -134,8 +151,19 @@ class FavDetailController extends GetxController {
         'privacy': [23, 1].contains(item!.attr) ? 1 : 0,
       },
     );
+    if (res is! Map || res['title'] == null) return;
     title.value = res['title'];
-    debugPrint(title.value);
+    item?.title = title.value;
+    if (Get.isRegistered<FavController>()) {
+      final FavController favController = Get.find<FavController>();
+      for (final folder in favController.favFolderList) {
+        if (folder.id == mediaId) {
+          folder.title = title.value;
+          break;
+        }
+      }
+      favController.favFolderList.refresh();
+    }
   }
 
   Future<void> toViewPlayAll() async {

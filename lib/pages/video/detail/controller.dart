@@ -117,10 +117,11 @@ class VideoDetailController extends GetxController
   RxDouble sheetHeight = 0.0.obs;
   RxString archiveSourceType = 'dash'.obs;
   ScrollController? replyScrollController;
-  List<MediaVideoItemModel> mediaList = <MediaVideoItemModel>[];
+  RxList<MediaVideoItemModel> mediaList = <MediaVideoItemModel>[].obs;
   RxBool isWatchLaterVisible = false.obs;
   RxBool lockMediaPlaylist = false.obs;
   RxBool resumePlaylistProgress = true.obs;
+  RxString activePlaylistBvid = ''.obs;
   RxString watchLaterTitle = ''.obs;
 
   bool get shouldAutoAdvance =>
@@ -177,6 +178,7 @@ class VideoDetailController extends GetxController
     );
 
     sourceType.value = argMap['sourceType'] ?? 'normal';
+    activePlaylistBvid.value = bvid;
     isWatchLaterVisible.value =
         sourceType.value == 'watchLater' || sourceType.value == 'fav';
     lockMediaPlaylist.value = isWatchLaterVisible.value;
@@ -188,7 +190,7 @@ class VideoDetailController extends GetxController
       watchLaterTitle.value = argMap['favTitle'];
       final suppliedList = argMap['mediaList'];
       if (suppliedList is List<MediaVideoItemModel>) {
-        mediaList = List.of(suppliedList);
+        mediaList.assignAll(suppliedList);
       } else {
         queryFavVideoList();
       }
@@ -616,7 +618,7 @@ class VideoDetailController extends GetxController
       ps: count,
     );
     if (res['status']) {
-      mediaList = res['data'].reversed.toList();
+      mediaList.assignAll(res['data'].reversed);
     } else {
       SmartDialog.showToast(res['msg']);
     }
@@ -629,9 +631,9 @@ class VideoDetailController extends GetxController
       return MediaListPanel(
         sheetHeight: sheetHeight.value,
         mediaList: mediaList,
+        activeBvid: activePlaylistBvid,
         changeMediaList: changeMediaList,
         panelTitle: watchLaterTitle.value,
-        bvid: bvid,
         mediaId: Get.arguments['mediaId'],
         hasMore: mediaList.length != Get.arguments['count'],
         playlistLocked: lockMediaPlaylist.value,
@@ -664,6 +666,7 @@ class VideoDetailController extends GetxController
     final VideoIntroController videoIntroCtr =
         Get.find<VideoIntroController>(tag: heroTag);
     bvid = bvidVal;
+    activePlaylistBvid.value = bvidVal;
     oid.value = aidVal ?? IdUtils.bv2av(bvid);
     cid.value = cidVal;
     danmakuCid.value = cidVal;
@@ -697,7 +700,7 @@ class VideoDetailController extends GetxController
       bvid: bvid,
     );
     if (res['status']) {
-      mediaList = res['data'];
+      mediaList.assignAll(res['data']);
     }
   }
 
