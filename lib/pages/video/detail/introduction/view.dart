@@ -14,8 +14,11 @@ import 'package:pilipala/common/widgets/network_img_layer.dart';
 import 'package:pilipala/common/widgets/stat/danmu.dart';
 import 'package:pilipala/common/widgets/stat/view.dart';
 import 'package:pilipala/models/video_detail_res.dart';
+import 'package:pilipala/models/offline_media.dart';
+import 'package:pilipala/models/video/play/quality.dart';
 import 'package:pilipala/pages/video/detail/introduction/controller.dart';
 import 'package:pilipala/pages/video/detail/widgets/ai_detail.dart';
+import 'package:pilipala/services/offline_cache_service.dart';
 import 'package:pilipala/utils/feed_back.dart';
 import 'package:pilipala/utils/global_data_cache.dart';
 import 'package:pilipala/utils/storage.dart';
@@ -147,6 +150,7 @@ class _VideoInfoState extends State<VideoInfo> with TickerProviderStateMixin {
   bool isProcessing = false;
   RxBool isExpand = false.obs;
   late ExpandableController _expandableCtr;
+  final OfflineCacheService _offlineCacheService = OfflineCacheService.instance;
 
   void Function()? handleState(Future<dynamic> Function() action) {
     return isProcessing
@@ -170,6 +174,89 @@ class _VideoInfoState extends State<VideoInfo> with TickerProviderStateMixin {
     owner = widget.videoDetail!.owner;
     enableAi = setting.get(SettingBoxKey.enableAi, defaultValue: true);
     _expandableCtr = ExpandableController(initialExpanded: false);
+    _offlineCacheService.ensureInitialized();
+  }
+
+  Future<void> _startOfflineCache() async {
+    final VideoDetailData detail = videoIntroController.videoDetail.value;
+    final bool completed = await _offlineCacheService.download(
+      bvid: videoDetailCtr.bvid,
+      cid: videoDetailCtr.cid.value,
+      title: detail.title ?? '未知视频',
+      ownerName: detail.owner?.name ?? '',
+      coverUrl: detail.pic ?? '',
+      videoUrl: videoDetailCtr.videoUrl,
+      audioUrl: videoDetailCtr.audioUrl,
+      qualityLabel: videoDetailCtr.currentVideoQa.description as String,
+      durationSeconds: detail.duration ?? 0,
+    );
+    if (completed) {
+      SmartDialog.showToast('已保存到离线缓存');
+    }
+  }
+
+  Widget _buildOfflineCacheButton(BuildContext context) {
+    return Obx(() {
+      final String cacheKey = OfflineMediaItem.makeCacheKey(
+        videoDetailCtr.bvid,
+        videoDetailCtr.cid.value,
+      );
+      final bool downloading = _offlineCacheService.isDownloading(cacheKey);
+      final bool downloaded = _offlineCacheService.isDownloaded(cacheKey);
+      final bool sourceReady = videoDetailCtr.offlineSourceReady.value;
+      final double progress = _offlineCacheService.progressOf(cacheKey);
+      final String title = downloaded
+          ? '已保存到本地'
+          : downloading
+              ? '正在保存 ${(progress * 100).round()}%'
+              : '保存到本地';
+
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        child: Material(
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(12),
+          clipBehavior: Clip.antiAlias,
+          child: ListTile(
+            dense: true,
+            leading: downloading
+                ? SizedBox.square(
+                    dimension: 22,
+                    child: CircularProgressIndicator(
+                      value: progress > 0 ? progress : null,
+                      strokeWidth: 2.5,
+                    ),
+                  )
+                : Icon(downloaded
+                    ? Icons.download_done_rounded
+                    : Icons.download_for_offline_outlined),
+            title: Text(title),
+            subtitle: Text(downloaded
+                ? '点击查看离线缓存'
+                : downloading
+                    ? '点击可取消，离开页面后仍会继续'
+                    : '保存当前清晰度，供 App 离线播放'),
+            trailing: downloading
+                ? const Icon(Icons.close_rounded, size: 20)
+                : const Icon(Icons.chevron_right_rounded),
+            enabled: sourceReady || downloading || downloaded,
+            onTap: downloading
+                ? () => _offlineCacheService.cancel(cacheKey)
+                : downloaded
+                    ? () => Get.toNamed('/offlineMedia')
+                    : sourceReady
+                        ? () async {
+                            try {
+                              await _startOfflineCache();
+                            } catch (error) {
+                              SmartDialog.showToast('保存失败：$error');
+                            }
+                          }
+                        : null,
+          ),
+        ),
+      );
+    });
   }
 
   // 收藏
@@ -382,6 +469,7 @@ class _VideoInfoState extends State<VideoInfo> with TickerProviderStateMixin {
 
           /// 点赞收藏转发
           Material(child: actionGrid(context, videoIntroController)),
+          _buildOfflineCacheButton(context),
           // 合集 videoPart 简洁
           if (widget.videoDetail!.ugcSeason != null) ...[
             Obx(

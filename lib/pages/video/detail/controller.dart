@@ -118,6 +118,7 @@ class VideoDetailController extends GetxController
   ].obs;
   RxDouble sheetHeight = 0.0.obs;
   RxString archiveSourceType = 'dash'.obs;
+  RxBool offlineSourceReady = false.obs;
   ScrollController? replyScrollController;
   RxList<MediaVideoItemModel> mediaList = <MediaVideoItemModel>[].obs;
   RxBool isWatchLaterVisible = false.obs;
@@ -329,6 +330,7 @@ class VideoDetailController extends GetxController
 
   // 视频链接
   Future queryVideoUrl({bool resumeHistoryProgress = true}) async {
+    offlineSourceReady.value = false;
     var result =
         await VideoHttp.videoUrl(cid: cid.value, bvid: bvid, qn: cacheVideoQa);
     if (result['status']) {
@@ -342,6 +344,9 @@ class VideoDetailController extends GetxController
         audioUrl = '';
         defaultST = Duration.zero;
         firstVideo = VideoItem();
+        currentVideoQa = VideoQualityCode.fromCode(data.quality ?? 16) ??
+            VideoQuality.flunt360;
+        offlineSourceReady.value = true;
         if (autoPlay.value) {
           await playerInit();
           isShowCover.value = false;
@@ -357,6 +362,7 @@ class VideoDetailController extends GetxController
             : Duration.zero;
         firstVideo = VideoItem();
         currentVideoQa = VideoQualityCode.fromCode(data.quality!)!;
+        offlineSourceReady.value = true;
         if (autoPlay.value) {
           await playerInit();
           isShowCover.value = false;
@@ -461,6 +467,7 @@ class VideoDetailController extends GetxController
       defaultST = resumeHistoryProgress
           ? Duration(milliseconds: data.lastPlayTime!)
           : Duration.zero;
+      offlineSourceReady.value = true;
       if (autoPlay.value) {
         await playerInit();
         isShowCover.value = false;

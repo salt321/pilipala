@@ -40,6 +40,7 @@ import '../pages/member_dynamics/index.dart';
 import '../pages/member_like/index.dart';
 import '../pages/member_search/index.dart';
 import '../pages/member_seasons/index.dart';
+import '../pages/offline_media/index.dart';
 import '../pages/search/index.dart';
 import '../pages/search_result/index.dart';
 import '../pages/setting/extra_setting.dart';
@@ -81,6 +82,9 @@ class Routes {
     CustomGetPage(name: '/setting', page: () => const SettingPage()),
     //
     CustomGetPage(name: '/media', page: () => const MediaPage()),
+    CustomGetPage(name: '/offlineMedia', page: () => const OfflineMediaPage()),
+    CustomGetPage(
+        name: '/offlinePlayer', page: () => const OfflinePlayerPage()),
     //
     CustomGetPage(name: '/fav', page: () => const FavPage()),
     //
