@@ -414,8 +414,9 @@ class VideoIntroController extends GetxController {
     String bvid,
     int cid,
     int? aid,
-    String? cover,
-  ) async {
+    String? cover, {
+    bool autoAdvance = false,
+  }) async {
     // 重新获取视频资源
     final VideoDetailController videoDetailCtr =
         Get.find<VideoDetailController>(tag: heroTag);
@@ -432,7 +433,10 @@ class VideoIntroController extends GetxController {
       ..cid.value = cid
       ..danmakuCid.value = cid
       ..cover.value = cover ?? ''
-      ..queryVideoUrl()
+      ..queryVideoUrl(
+        resumeHistoryProgress:
+            !autoAdvance || videoDetailCtr.resumePlaylistProgress.value,
+      )
       ..clearSubtitleContent();
     await videoDetailCtr.getSubtitle();
     videoDetailCtr.setSubtitleContent();
@@ -537,7 +541,13 @@ class VideoIntroController extends GetxController {
     final String rBvid = isPages ? bvid : nextItem.bvid;
     final int rAid =
         isPages ? IdUtils.bv2av(bvid) : (nextItem.aid ?? nextItem.id);
-    changeSeasonOrbangu(rBvid, cid, rAid, cover);
+    changeSeasonOrbangu(
+      rBvid,
+      cid,
+      rAid,
+      cover,
+      autoAdvance: true,
+    );
   }
 
   // 设置关注分组

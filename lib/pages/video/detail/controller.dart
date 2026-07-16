@@ -120,6 +120,7 @@ class VideoDetailController extends GetxController
   List<MediaVideoItemModel> mediaList = <MediaVideoItemModel>[];
   RxBool isWatchLaterVisible = false.obs;
   RxBool lockMediaPlaylist = false.obs;
+  RxBool resumePlaylistProgress = true.obs;
   RxString watchLaterTitle = ''.obs;
 
   bool get shouldAutoAdvance =>
@@ -315,7 +316,7 @@ class VideoDetailController extends GetxController
   }
 
   // 视频链接
-  Future queryVideoUrl() async {
+  Future queryVideoUrl({bool resumeHistoryProgress = true}) async {
     var result =
         await VideoHttp.videoUrl(cid: cid.value, bvid: bvid, qn: cacheVideoQa);
     if (result['status']) {
@@ -443,7 +444,9 @@ class VideoDetailController extends GetxController
       if (firstAudio.id != null) {
         currentAudioQa = AudioQualityCode.fromCode(firstAudio.id!)!;
       }
-      defaultST = Duration(milliseconds: data.lastPlayTime!);
+      defaultST = resumeHistoryProgress
+          ? Duration(milliseconds: data.lastPlayTime!)
+          : Duration.zero;
       if (autoPlay.value) {
         await playerInit();
         isShowCover.value = false;
@@ -632,7 +635,9 @@ class VideoDetailController extends GetxController
         mediaId: Get.arguments['mediaId'],
         hasMore: mediaList.length != Get.arguments['count'],
         playlistLocked: lockMediaPlaylist.value,
+        resumeProgress: resumePlaylistProgress.value,
         onPlaylistLockChanged: toggleMediaPlaylistLock,
+        onResumeProgressChanged: togglePlaylistProgressResume,
       );
     });
     replyReplyBottomSheetCtr?.closed.then((value) {
@@ -644,6 +649,13 @@ class VideoDetailController extends GetxController
     lockMediaPlaylist.toggle();
     SmartDialog.showToast(
       lockMediaPlaylist.value ? '已锁定当前播放队列' : '已切换到视频原始列表',
+    );
+  }
+
+  void togglePlaylistProgressResume() {
+    resumePlaylistProgress.toggle();
+    SmartDialog.showToast(
+      resumePlaylistProgress.value ? '自动播放将继承历史进度' : '自动播放将从头开始',
     );
   }
 

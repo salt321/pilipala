@@ -22,7 +22,9 @@ class MediaListPanel extends StatefulWidget {
     this.mediaId,
     this.hasMore = false,
     this.playlistLocked = true,
+    this.resumeProgress = true,
     this.onPlaylistLockChanged,
+    this.onResumeProgressChanged,
     super.key,
   });
 
@@ -34,7 +36,9 @@ class MediaListPanel extends StatefulWidget {
   final int? mediaId;
   final bool hasMore;
   final bool playlistLocked;
+  final bool resumeProgress;
   final VoidCallback? onPlaylistLockChanged;
+  final VoidCallback? onResumeProgressChanged;
 
   @override
   State<MediaListPanel> createState() => _MediaListPanelState();
@@ -44,11 +48,13 @@ class _MediaListPanelState extends State<MediaListPanel> {
   RxList<MediaVideoItemModel> mediaList = <MediaVideoItemModel>[].obs;
   final ScrollController _scrollController = ScrollController();
   late bool _playlistLocked;
+  late bool _resumeProgress;
 
   @override
   void initState() {
     super.initState();
     _playlistLocked = widget.playlistLocked;
+    _resumeProgress = widget.resumeProgress;
     mediaList.value = widget.mediaList;
     _scrollController.addListener(() {
       if (_scrollController.position.pixels >=
@@ -110,6 +116,17 @@ class _MediaListPanelState extends State<MediaListPanel> {
               ],
             ),
             actions: [
+              IconButton(
+                tooltip: _resumeProgress ? '自动播放时继承历史进度' : '自动播放时从头播放',
+                icon: Icon(
+                  _resumeProgress ? Icons.history : Icons.restart_alt,
+                  size: 20,
+                ),
+                onPressed: () {
+                  setState(() => _resumeProgress = !_resumeProgress);
+                  widget.onResumeProgressChanged?.call();
+                },
+              ),
               IconButton(
                 tooltip: _playlistLocked ? '解锁并使用视频原始列表' : '锁定当前播放队列',
                 icon: Icon(
