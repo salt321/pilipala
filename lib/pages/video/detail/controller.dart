@@ -122,6 +122,7 @@ class VideoDetailController extends GetxController
   RxBool lockMediaPlaylist = false.obs;
   RxBool resumePlaylistProgress = true.obs;
   RxString activePlaylistBvid = ''.obs;
+  RxInt activePlaylistIndex = 0.obs;
   RxString watchLaterTitle = ''.obs;
 
   bool get shouldAutoAdvance =>
@@ -191,6 +192,13 @@ class VideoDetailController extends GetxController
       final suppliedList = argMap['mediaList'];
       if (suppliedList is List<MediaVideoItemModel>) {
         mediaList.assignAll(suppliedList);
+        final int? suppliedIndex = argMap['startIndex'] as int?;
+        final int currentIndex =
+            mediaList.indexWhere((item) => item.bvid == bvid);
+        activePlaylistIndex.value = mediaList.isEmpty
+            ? 0
+            : suppliedIndex?.clamp(0, mediaList.length - 1) ??
+                (currentIndex < 0 ? 0 : currentIndex);
       } else {
         queryFavVideoList();
       }
@@ -619,6 +627,9 @@ class VideoDetailController extends GetxController
     );
     if (res['status']) {
       mediaList.assignAll(res['data'].reversed);
+      final int currentIndex =
+          mediaList.indexWhere((item) => item.bvid == bvid);
+      activePlaylistIndex.value = currentIndex < 0 ? 0 : currentIndex;
     } else {
       SmartDialog.showToast(res['msg']);
     }
@@ -662,11 +673,12 @@ class VideoDetailController extends GetxController
   }
 
   // 切换稍后再看
-  Future changeMediaList(bvidVal, cidVal, aidVal, coverVal) async {
+  Future changeMediaList(bvidVal, cidVal, aidVal, coverVal, index) async {
     final VideoIntroController videoIntroCtr =
         Get.find<VideoIntroController>(tag: heroTag);
     bvid = bvidVal;
     activePlaylistBvid.value = bvidVal;
+    activePlaylistIndex.value = index;
     oid.value = aidVal ?? IdUtils.bv2av(bvid);
     cid.value = cidVal;
     danmakuCid.value = cidVal;
@@ -701,6 +713,9 @@ class VideoDetailController extends GetxController
     );
     if (res['status']) {
       mediaList.assignAll(res['data']);
+      final int currentIndex =
+          mediaList.indexWhere((item) => item.bvid == bvid);
+      activePlaylistIndex.value = currentIndex < 0 ? 0 : currentIndex;
     }
   }
 

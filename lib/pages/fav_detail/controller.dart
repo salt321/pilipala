@@ -243,6 +243,7 @@ class FavDetailController extends GetxController {
         'favTitle': title.value,
         'count': playbackQueue.length,
         'mediaList': playbackQueue,
+        'startIndex': startIndex,
       },
     );
   }

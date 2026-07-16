@@ -28,6 +28,12 @@ void main() {
     expect(find.text('自动播放：当前队列'), findsOneWidget);
     expect(find.byIcon(Icons.lock), findsOneWidget);
     expect(find.byIcon(Icons.history), findsOneWidget);
+    final ListView virtualList = tester.widget<ListView>(find.byType(ListView));
+    final SliverChildBuilderDelegate delegate =
+        virtualList.childrenDelegate as SliverChildBuilderDelegate;
+    expect(virtualList.itemExtent, 104);
+    expect(virtualList.cacheExtent, 208);
+    expect(delegate.addAutomaticKeepAlives, isFalse);
 
     await tester.tap(find.byTooltip('自动播放时继承历史进度'));
     await tester.pump();
@@ -79,5 +85,38 @@ void main() {
 
     title = tester.widget<Text>(find.text('当前视频'));
     expect(title.style?.color, isNull);
+  });
+
+  testWidgets('一万条播放队列只构建可见范围', (tester) async {
+    GlobalDataCache().imgQuality = 10;
+    final mediaList = List<MediaVideoItemModel>.generate(
+      10000,
+      (index) => MediaVideoItemModel(
+        id: index,
+        bvid: 'BV$index',
+        title: '视频$index',
+        cover: '',
+        duration: 60,
+        upper: Upper(name: 'UP主'),
+        cntInfo: {'play': 1, 'danmaku': 0},
+      ),
+    ).obs;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: MediaListPanel(
+            sheetHeight: 500,
+            mediaList: mediaList,
+            activeBvid: 'BV0'.obs,
+          ),
+        ),
+      ),
+    );
+
+    final int builtItems = find.byType(InkWell).evaluate().length;
+    expect(builtItems, greaterThan(0));
+    expect(builtItems, lessThan(20));
+    expect(find.text('视频9999'), findsNothing);
   });
 }

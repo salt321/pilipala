@@ -485,16 +485,19 @@ class VideoIntroController extends GetxController {
 
   /// 列表循环或者顺序播放时，自动播放下一个
   Future<void> nextPlay() async {
-    final List episodes = [];
+    late final List episodes;
     bool isPages = false;
+    bool isCustomPlaylist = false;
     late String cover;
     final VideoDetailController videoDetailCtr =
         Get.find<VideoDetailController>(tag: heroTag);
 
     /// 优先稍后再看、收藏夹
     if (videoDetailCtr.lockMediaPlaylist.value) {
-      episodes.addAll(videoDetailCtr.mediaList);
+      episodes = videoDetailCtr.mediaList;
+      isCustomPlaylist = true;
     } else if (videoDetail.value.ugcSeason != null) {
+      episodes = [];
       final UgcSeason ugcSeason = videoDetail.value.ugcSeason!;
       final List<SectionItem> sections = ugcSeason.sections!;
       for (int i = 0; i < sections.length; i++) {
@@ -502,14 +505,21 @@ class VideoIntroController extends GetxController {
         episodes.addAll(episodesList);
       }
     } else if (videoDetail.value.pages != null) {
+      episodes = [];
       isPages = true;
       final List<Part> pages = videoDetail.value.pages!;
       episodes.addAll(pages);
+    } else {
+      return;
     }
 
     if (episodes.isEmpty) return;
-    final int currentIndex =
-        episodes.indexWhere((e) => e.cid == lastPlayCid.value);
+    int currentIndex = isCustomPlaylist
+        ? videoDetailCtr.activePlaylistIndex.value
+        : episodes.indexWhere((e) => e.cid == lastPlayCid.value);
+    if (currentIndex < 0 || currentIndex >= episodes.length) {
+      currentIndex = episodes.indexWhere((e) => e.cid == lastPlayCid.value);
+    }
     int nextIndex = currentIndex < 0 ? 0 : currentIndex + 1;
     final PlayRepeat platRepeat = videoDetailCtr.plPlayerController.playRepeat;
 
@@ -523,6 +533,10 @@ class VideoIntroController extends GetxController {
       }
     }
     if (nextIndex >= episodes.length) return;
+
+    if (isCustomPlaylist) {
+      videoDetailCtr.activePlaylistIndex.value = nextIndex;
+    }
 
     final nextItem = episodes[nextIndex];
     int cid = nextItem.cid ?? -1;
