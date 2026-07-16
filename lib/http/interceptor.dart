@@ -1,12 +1,23 @@
 // ignore_for_file: avoid_print
 
+import 'dart:async';
+import 'dart:developer';
+
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
-import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:hive/hive.dart';
 import '../utils/storage.dart';
 
 class ApiInterceptor extends Interceptor {
+  ApiInterceptor({required Dio dio}) : _dio = dio;
+
+  static const int maxRetries = 5;
+  static const Duration _retryDelay = Duration(seconds: 1);
+  static const Duration _reconnectTimeout = Duration(seconds: 5);
+  static const String _retryCountKey = 'api_retry_count';
+
+  final Dio _dio;
+
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
     // print("请求之前");
@@ -43,17 +54,91 @@ class ApiInterceptor extends Interceptor {
 
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) async {
-    // 处理网络请求错误
-    // handler.next(err);
-    String url = err.requestOptions.uri.toString();
-    final excludedPatterns = RegExp(r'heartbeat|seg\.so|online/total');
-    if (!excludedPatterns.hasMatch(url)) {
-      SmartDialog.showToast(
-        await dioError(err),
-        displayType: SmartToastType.onlyRefresh,
-      );
+    final int retryCount =
+        err.requestOptions.extra[_retryCountKey] as int? ?? 0;
+    _logNetworkError(err, retryCount);
+
+    if (!_canRetry(err, retryCount)) {
+      handler.next(err);
+      return;
     }
-    super.onError(err, handler);
+
+    if (!await _waitForConnection()) {
+      handler.next(err);
+      return;
+    }
+
+    await Future<void>.delayed(_retryDelay);
+    err.requestOptions.extra[_retryCountKey] = retryCount + 1;
+
+    try {
+      handler.resolve(await _retryRequest(err.requestOptions));
+    } on DioException catch (retryError) {
+      handler.next(retryError);
+    }
+  }
+
+  bool _canRetry(DioException error, int retryCount) {
+    final String method = error.requestOptions.method.toUpperCase();
+    final bool isSafeMethod = method == 'GET' || method == 'HEAD';
+    final bool isRetryableError = switch (error.type) {
+      DioExceptionType.connectionError ||
+      DioExceptionType.connectionTimeout ||
+      DioExceptionType.receiveTimeout ||
+      DioExceptionType.sendTimeout ||
+      DioExceptionType.unknown =>
+        true,
+      _ => false,
+    };
+    return isSafeMethod && isRetryableError && retryCount < maxRetries;
+  }
+
+  Future<bool> _waitForConnection() async {
+    final Connectivity connectivity = Connectivity();
+    final List<ConnectivityResult> current =
+        await connectivity.checkConnectivity();
+    if (!_isDisconnected(current)) {
+      return true;
+    }
+
+    final Completer<bool> completer = Completer<bool>();
+    StreamSubscription<List<ConnectivityResult>>? subscription;
+    Timer? timeoutTimer;
+
+    Future<void> finish(bool connected) async {
+      if (completer.isCompleted) {
+        return;
+      }
+      completer.complete(connected);
+      timeoutTimer?.cancel();
+      await subscription?.cancel();
+    }
+
+    subscription = connectivity.onConnectivityChanged.listen((results) {
+      if (!_isDisconnected(results)) {
+        finish(true);
+      }
+    });
+    timeoutTimer = Timer(_reconnectTimeout, () => finish(false));
+    return completer.future;
+  }
+
+  bool _isDisconnected(List<ConnectivityResult> results) {
+    return results.isEmpty ||
+        (results.length == 1 && results.contains(ConnectivityResult.none));
+  }
+
+  Future<Response<dynamic>> _retryRequest(RequestOptions options) {
+    return _dio.fetch<dynamic>(options);
+  }
+
+  void _logNetworkError(DioException error, int retryCount) {
+    log(
+      'HTTP ${error.requestOptions.method} ${error.requestOptions.uri} '
+      'failed: type=${error.type.name}, retry=$retryCount/$maxRetries, '
+      'message=${error.message}, cause=${error.error}',
+      name: 'ApiInterceptor',
+    );
   }
 
   static Future<String> dioError(DioException error) async {
@@ -73,30 +158,16 @@ class ApiInterceptor extends Interceptor {
       case DioExceptionType.sendTimeout:
         return '发送请求超时，请检查网络设置';
       case DioExceptionType.unknown:
-        final String res = await checkConnect();
-        return '$res，网络异常！';
-    }
-  }
-
-  static Future<String> checkConnect() async {
-    final List<ConnectivityResult> connectivityResult =
-        await Connectivity().checkConnectivity();
-    if (connectivityResult.contains(ConnectivityResult.mobile)) {
-      return '正在使用移动流量';
-    } else if (connectivityResult.contains(ConnectivityResult.wifi)) {
-      return '正在使用wifi';
-    } else if (connectivityResult.contains(ConnectivityResult.ethernet)) {
-      return '正在使用局域网';
-    } else if (connectivityResult.contains(ConnectivityResult.vpn)) {
-      return '正在使用代理网络';
-    } else if (connectivityResult.contains(ConnectivityResult.bluetooth)) {
-      return '正在使用蓝牙网络';
-    } else if (connectivityResult.contains(ConnectivityResult.other)) {
-      return '正在使用其他网络';
-    } else if (connectivityResult.contains(ConnectivityResult.none)) {
-      return '未连接到任何网络';
-    } else {
-      return '';
+        final List<ConnectivityResult> connectivityResult =
+            await Connectivity().checkConnectivity();
+        if (connectivityResult.contains(ConnectivityResult.none)) {
+          return '未连接到网络，请检查网络设置';
+        }
+        final String? detail = error.message?.trim();
+        if (detail != null && detail.isNotEmpty) {
+          return '网络请求异常：$detail';
+        }
+        return '网络请求异常，请稍后重试';
     }
   }
 }
