@@ -31,6 +31,26 @@ class OfflineMediaItem {
 
   static String makeCacheKey(String bvid, int cid) => '${bvid}_$cid';
 
+  OfflineMediaItem copyWith({
+    String? title,
+    int? durationSeconds,
+  }) {
+    return OfflineMediaItem(
+      cacheKey: cacheKey,
+      bvid: bvid,
+      cid: cid,
+      title: title ?? this.title,
+      ownerName: ownerName,
+      coverPath: coverPath,
+      videoPath: videoPath,
+      audioPath: audioPath,
+      qualityLabel: qualityLabel,
+      durationSeconds: durationSeconds ?? this.durationSeconds,
+      sizeBytes: sizeBytes,
+      createdAt: createdAt,
+    );
+  }
+
   factory OfflineMediaItem.fromJson(Map<String, dynamic> json) {
     return OfflineMediaItem(
       cacheKey: json['cacheKey'] as String? ?? '',

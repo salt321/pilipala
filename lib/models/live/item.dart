@@ -50,28 +50,34 @@ class LiveItemModel {
   Map? watchedShow;
 
   LiveItemModel.fromJson(Map<String, dynamic> json) {
-    roomId = json['roomid'];
+    final dynamic rawRoomId = json['roomid'] ?? json['room_id'];
+    roomId = rawRoomId is num
+        ? rawRoomId.toInt()
+        : int.tryParse(rawRoomId?.toString() ?? '');
     uid = json['uid'];
-    title = json['title'];
-    uname = json['uname'];
+    title = json['title']?.toString() ?? '未命名直播';
+    uname = json['uname']?.toString() ?? '未知主播';
     online = json['online'];
-    userCover = json['user_cover'];
+    userCover = json['user_cover']?.toString();
     userCoverFlag = json['user_cover_flag'];
-    systemCover = json['system_cover'];
-    cover = json['cover'];
-    pic = json['cover'];
+    systemCover = json['system_cover']?.toString();
+    cover = (json['cover'] ?? json['user_cover'] ?? json['system_cover'] ?? '')
+        .toString();
+    pic = cover;
     link = json['link'];
     face = json['face'];
     parentId = json['parent_id'];
     parentName = json['parent_name'];
     areaId = json['area_id'];
-    areaName = json['area_name'];
+    areaName = json['area_name']?.toString() ?? '未知分区';
     sessionId = json['session_id'];
     groupId = json['group_id'];
     pkId = json['pk_id'];
     verify = json['verify'];
     headBox = json['head_box'];
     headBoxType = json['head_box_type'];
-    watchedShow = json['watched_show'];
+    watchedShow = json['watched_show'] is Map
+        ? Map<String, dynamic>.from(json['watched_show'] as Map)
+        : <String, dynamic>{};
   }
 }

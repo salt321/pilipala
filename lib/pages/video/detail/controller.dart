@@ -11,6 +11,7 @@ import 'package:pilipala/http/user.dart';
 import 'package:pilipala/http/video.dart';
 import 'package:pilipala/models/common/reply_type.dart';
 import 'package:pilipala/models/common/search_type.dart';
+import 'package:pilipala/models/offline_media.dart';
 import 'package:pilipala/models/video/later.dart';
 import 'package:pilipala/models/video/play/quality.dart';
 import 'package:pilipala/models/video/play/url.dart';
@@ -45,6 +46,11 @@ class VideoDetailController extends GetxController
   SearchType videoType = Get.arguments['videoType'] ?? SearchType.video;
   // 页面来源 稍后再看 收藏夹
   RxString sourceType = 'normal'.obs;
+  final Rxn<OfflineMediaItem> offlineCurrentItem = Rxn<OfflineMediaItem>();
+  final List<OfflineMediaItem> offlineItems = [];
+  int offlineCurrentIndex = 0;
+
+  bool get isOffline => sourceType.value == 'offline';
 
   /// tabs相关配置
   late TabController tabCtr;
@@ -172,7 +178,6 @@ class VideoDetailController extends GetxController
     defaultAudioQa = setting.get(SettingBoxKey.defaultAudioQa,
         defaultValue: AudioQuality.hiRes.code);
     oid.value = IdUtils.bv2av(Get.parameters['bvid']!);
-    getSubtitle();
     headerControl = HeaderControl(
       controller: plPlayerController,
       videoDetailCtr: this,
@@ -182,6 +187,26 @@ class VideoDetailController extends GetxController
     );
 
     sourceType.value = argMap['sourceType'] ?? 'normal';
+    if (isOffline) {
+      final dynamic suppliedItems = argMap['offlineItems'];
+      if (suppliedItems is List) {
+        offlineItems.assignAll(suppliedItems.whereType<OfflineMediaItem>());
+      }
+      if (offlineItems.isEmpty) {
+        throw StateError('离线播放列表为空');
+      }
+      offlineCurrentIndex =
+          (argMap['startIndex'] as int? ?? 0).clamp(0, offlineItems.length - 1);
+      offlineCurrentItem.value = offlineItems[offlineCurrentIndex];
+      watchLaterTitle.value = argMap['playlistTitle'] as String? ?? '离线缓存';
+      tabs.assignAll(const ['离线详情', '评论']);
+      autoPlay.value = true;
+      enableHeart = false;
+      lockMediaPlaylist.value = true;
+      enableRelatedVideo = false;
+    } else {
+      getSubtitle();
+    }
     activePlaylistBvid.value = bvid;
     isWatchLaterVisible.value =
         sourceType.value == 'watchLater' || sourceType.value == 'fav';
@@ -331,6 +356,7 @@ class VideoDetailController extends GetxController
   // 视频链接
   Future queryVideoUrl({bool resumeHistoryProgress = true}) async {
     offlineSourceReady.value = false;
+    if (isOffline) return _initializeOfflineSource();
     var result =
         await VideoHttp.videoUrl(cid: cid.value, bvid: bvid, qn: cacheVideoQa);
     if (result['status']) {
@@ -479,6 +505,64 @@ class VideoDetailController extends GetxController
       SmartDialog.showToast(result['msg'].toString());
     }
     return result;
+  }
+
+  Future<Map<String, dynamic>> _initializeOfflineSource() async {
+    final OfflineMediaItem? item = offlineCurrentItem.value;
+    if (item == null) throw StateError('离线媒体信息不存在');
+    if (!await File(item.videoPath).exists()) {
+      throw StateError('离线视频文件不存在');
+    }
+    if (item.hasAudio && !await File(item.audioPath).exists()) {
+      throw StateError('离线音频文件不存在');
+    }
+    bvid = item.bvid;
+    cid.value = item.cid;
+    danmakuCid.value = item.cid;
+    oid.value = IdUtils.bv2av(item.bvid);
+    cover.value = item.coverPath;
+    videoUrl = item.videoPath;
+    audioUrl = item.audioPath;
+    defaultST = Duration.zero;
+    await plPlayerController.setDataSource(
+      DataSource(
+        videoSource: item.videoPath,
+        audioSource: item.audioPath,
+        type: DataSourceType.file,
+      ),
+      autoplay: true,
+      duration: Duration(seconds: item.durationSeconds),
+      durationIsAuthoritative: true,
+      direction: 'horizontal',
+      bvid: '',
+      cid: 0,
+      enableHeart: false,
+      isFirstTime: isFirstTime,
+    );
+    plPlayerController.headerControl = headerControl;
+    offlineSourceReady.value = true;
+    isShowCover.value = false;
+    return {'status': true, 'data': item};
+  }
+
+  Future<bool> playOfflineAdjacent(int offset) async {
+    if (!isOffline || offlineItems.isEmpty) return false;
+    int target = offlineCurrentIndex + offset;
+    if (target < 0 || target >= offlineItems.length) {
+      if (plPlayerController.playRepeat != PlayRepeat.listCycle) return false;
+      target = target < 0 ? offlineItems.length - 1 : 0;
+    }
+    offlineCurrentIndex = target;
+    offlineCurrentItem.value = offlineItems[target];
+    activePlaylistIndex.value = target;
+    activePlaylistBvid.value = offlineItems[target].bvid;
+    try {
+      await _initializeOfflineSource();
+      return true;
+    } catch (error) {
+      SmartDialog.showToast('无法播放离线项目：$error');
+      return false;
+    }
   }
 
   // mob端全屏状态关闭二级回复

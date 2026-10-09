@@ -17,6 +17,7 @@ import 'package:pilipala/models/common/search_type.dart';
 import 'package:pilipala/pages/bangumi/introduction/index.dart';
 import 'package:pilipala/pages/danmaku/view.dart';
 import 'package:pilipala/pages/main/index.dart';
+import 'package:pilipala/pages/offline_media/detail_panel.dart';
 import 'package:pilipala/pages/video/detail/reply/index.dart';
 import 'package:pilipala/pages/video/detail/controller.dart';
 import 'package:pilipala/pages/video/detail/introduction/index.dart';
@@ -30,7 +31,6 @@ import 'package:status_bar_control/status_bar_control.dart';
 import '../../../plugin/pl_player/models/bottom_control_type.dart';
 import '../../../services/shutdown_timer_service.dart';
 import 'widgets/app_bar.dart';
-import 'widgets/header_control.dart';
 
 class VideoDetailPage extends StatefulWidget {
   const VideoDetailPage({Key? key}) : super(key: key);
@@ -144,7 +144,9 @@ class _VideoDetailPageState extends State<VideoDetailPage>
 
       /// 顺序播放 列表循环
       if (vdCtr.shouldAutoAdvance) {
-        if (vdCtr.lockMediaPlaylist.value ||
+        if (vdCtr.isOffline) {
+          await vdCtr.playOfflineAdjacent(1);
+        } else if (vdCtr.lockMediaPlaylist.value ||
             vdCtr.videoType == SearchType.video) {
           videoIntroController.nextPlay();
         } else if (vdCtr.videoType == SearchType.media_bangumi) {
@@ -281,7 +283,7 @@ class _VideoDetailPageState extends State<VideoDetailPage>
     }
     vdCtr.isFirstTime = false;
     final bool autoplay = autoPlayEnable;
-    vdCtr.playerInit();
+    if (!vdCtr.isOffline) vdCtr.playerInit();
 
     /// 未开启自动播放时，未播放跳转下一页返回/播放后跳转下一页返回
     vdCtr.autoPlay.value = !vdCtr.isShowCover.value;
@@ -411,73 +413,89 @@ class _VideoDetailPageState extends State<VideoDetailPage>
             Flexible(
               flex: 1,
               child: Center(
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    Obx(() => AnimatedOpacity(
-                          opacity: playerStatus.value != PlayerStatus.playing
-                              ? 1
-                              : 0,
-                          duration: const Duration(milliseconds: 100),
-                          child: const Icon(
-                            Icons.drag_handle_rounded,
-                            size: 20,
-                            color: Colors.grey,
+                child: vdCtr.isOffline
+                    ? const Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          Icon(Icons.offline_pin_outlined, size: 18),
+                          SizedBox(width: 6),
+                          Text('离线播放', style: TextStyle(fontSize: 12)),
+                          SizedBox(width: 18),
+                        ],
+                      )
+                    : Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          Obx(() => AnimatedOpacity(
+                                opacity:
+                                    playerStatus.value != PlayerStatus.playing
+                                        ? 1
+                                        : 0,
+                                duration: const Duration(milliseconds: 100),
+                                child: const Icon(
+                                  Icons.drag_handle_rounded,
+                                  size: 20,
+                                  color: Colors.grey,
+                                ),
+                              )),
+                          const SizedBox(width: 8),
+                          SizedBox(
+                            height: 32,
+                            child: TextButton(
+                              style: ButtonStyle(
+                                padding:
+                                    MaterialStateProperty.all(EdgeInsets.zero),
+                              ),
+                              onPressed: () => vdCtr.showShootDanmakuSheet(),
+                              child: const Text('发弹幕',
+                                  style: TextStyle(fontSize: 12)),
+                            ),
                           ),
-                        )),
-                    const SizedBox(width: 8),
-                    SizedBox(
-                      height: 32,
-                      child: TextButton(
-                        style: ButtonStyle(
-                          padding: MaterialStateProperty.all(EdgeInsets.zero),
-                        ),
-                        onPressed: () => vdCtr.showShootDanmakuSheet(),
-                        child:
-                            const Text('发弹幕', style: TextStyle(fontSize: 12)),
-                      ),
-                    ),
-                    SizedBox(
-                      width: 38,
-                      height: 38,
-                      child: Obx(
-                        () => !vdCtr.isShowCover.value
-                            ? IconButton(
-                                onPressed: () {
-                                  plPlayerController?.isOpenDanmu.value =
-                                      !(plPlayerController?.isOpenDanmu.value ??
-                                          false);
-                                },
-                                icon: !(plPlayerController?.isOpenDanmu.value ??
-                                        false)
-                                    ? SvgPicture.asset(
+                          SizedBox(
+                            width: 38,
+                            height: 38,
+                            child: Obx(
+                              () => !vdCtr.isShowCover.value
+                                  ? IconButton(
+                                      onPressed: () {
+                                        plPlayerController?.isOpenDanmu.value =
+                                            !(plPlayerController
+                                                    ?.isOpenDanmu.value ??
+                                                false);
+                                      },
+                                      icon: !(plPlayerController
+                                                  ?.isOpenDanmu.value ??
+                                              false)
+                                          ? SvgPicture.asset(
+                                              'assets/images/video/danmu_close.svg',
+                                              // ignore: deprecated_member_use
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .outline,
+                                            )
+                                          : SvgPicture.asset(
+                                              'assets/images/video/danmu_open.svg',
+                                              // ignore: deprecated_member_use
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .primary,
+                                            ),
+                                    )
+                                  : IconButton(
+                                      icon: SvgPicture.asset(
                                         'assets/images/video/danmu_close.svg',
                                         // ignore: deprecated_member_use
                                         color: Theme.of(context)
                                             .colorScheme
                                             .outline,
-                                      )
-                                    : SvgPicture.asset(
-                                        'assets/images/video/danmu_open.svg',
-                                        // ignore: deprecated_member_use
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .primary,
                                       ),
-                              )
-                            : IconButton(
-                                icon: SvgPicture.asset(
-                                  'assets/images/video/danmu_close.svg',
-                                  // ignore: deprecated_member_use
-                                  color: Theme.of(context).colorScheme.outline,
-                                ),
-                                onPressed: () {},
-                              ),
+                                      onPressed: () {},
+                                    ),
+                            ),
+                          ),
+                          const SizedBox(width: 18),
+                        ],
                       ),
-                    ),
-                    const SizedBox(width: 18),
-                  ],
-                ),
               ),
             ),
           ],
@@ -489,7 +507,7 @@ class _VideoDetailPageState extends State<VideoDetailPage>
   @override
   Widget build(BuildContext context) {
     final sizeContext = MediaQuery.sizeOf(context);
-    final _context = MediaQuery.of(context);
+    final mediaQuery = MediaQuery.of(context);
     late double defaultVideoHeight = sizeContext.width * 9 / 16;
     late RxDouble videoHeight = defaultVideoHeight.obs;
     final double pinnedHeaderHeight =
@@ -497,9 +515,8 @@ class _VideoDetailPageState extends State<VideoDetailPage>
     // ignore: no_leading_underscores_for_local_identifiers
 
     // 竖屏
-    final bool isPortrait = _context.orientation == Orientation.portrait;
     // 横屏
-    final bool isLandscape = _context.orientation == Orientation.landscape;
+    final bool isLandscape = mediaQuery.orientation == Orientation.landscape;
     final Rx<bool> isFullScreen = plPlayerController?.isFullScreen ?? false.obs;
     // 全屏时高度撑满
     if (isLandscape || isFullScreen.value == true) {
@@ -520,14 +537,18 @@ class _VideoDetailPageState extends State<VideoDetailPage>
           : PLVideoPlayer(
               controller: plPlayerController!,
               headerControl: vdCtr.headerControl,
-              danmuWidget: PlDanmaku(
-                key: Key(vdCtr.danmakuCid.value.toString()),
-                cid: vdCtr.danmakuCid.value,
-                playerController: plPlayerController!,
-              ),
+              danmuWidget: vdCtr.isOffline
+                  ? null
+                  : PlDanmaku(
+                      key: Key(vdCtr.danmakuCid.value.toString()),
+                      cid: vdCtr.danmakuCid.value,
+                      playerController: plPlayerController!,
+                    ),
               bottomList: vdCtr.bottomList,
               onPrevious: () {
-                if (vdCtr.lockMediaPlaylist.value ||
+                if (vdCtr.isOffline) {
+                  vdCtr.playOfflineAdjacent(-1);
+                } else if (vdCtr.lockMediaPlaylist.value ||
                     vdCtr.videoType == SearchType.video) {
                   videoIntroController.previousPlay();
                 } else if (vdCtr.videoType == SearchType.media_bangumi) {
@@ -535,16 +556,20 @@ class _VideoDetailPageState extends State<VideoDetailPage>
                 }
               },
               onNext: () {
-                if (vdCtr.lockMediaPlaylist.value ||
+                if (vdCtr.isOffline) {
+                  vdCtr.playOfflineAdjacent(1);
+                } else if (vdCtr.lockMediaPlaylist.value ||
                     vdCtr.videoType == SearchType.video) {
                   videoIntroController.nextPlay();
                 } else if (vdCtr.videoType == SearchType.media_bangumi) {
                   bangumiIntroController.nextPlay();
                 }
               },
-              showEposideCb: () => vdCtr.videoType == SearchType.video
-                  ? videoIntroController.showEposideHandler()
-                  : bangumiIntroController.showEposideHandler(),
+              showEposideCb: vdCtr.isOffline
+                  ? null
+                  : () => vdCtr.videoType == SearchType.video
+                      ? videoIntroController.showEposideHandler()
+                      : bangumiIntroController.showEposideHandler(),
               fullScreenCb: (bool status) {
                 videoHeight.value =
                     status ? Get.size.height : defaultVideoHeight;
@@ -738,7 +763,10 @@ class _VideoDetailPageState extends State<VideoDetailPage>
                             return CustomScrollView(
                               key: const PageStorageKey<String>('简介'),
                               slivers: <Widget>[
-                                if (vdCtr.videoType == SearchType.video) ...[
+                                if (vdCtr.isOffline) ...[
+                                  OfflineVideoDetailPanel(controller: vdCtr),
+                                ] else if (vdCtr.videoType ==
+                                    SearchType.video) ...[
                                   VideoIntroPanel(bvid: vdCtr.bvid),
                                 ] else if (vdCtr.videoType ==
                                     SearchType.media_bangumi) ...[
@@ -754,20 +782,26 @@ class _VideoDetailPageState extends State<VideoDetailPage>
                                         .withOpacity(0.06),
                                   ),
                                 ),
-                                if (vdCtr.videoType == SearchType.video &&
+                                if (!vdCtr.isOffline &&
+                                    vdCtr.videoType == SearchType.video &&
                                     vdCtr.enableRelatedVideo)
                                   const RelatedVideoPanel(),
                               ],
                             );
                           },
                         ),
-                        Obx(
-                          () => VideoReplyPanel(
-                            bvid: vdCtr.bvid,
-                            oid: vdCtr.oid.value,
-                            onControllerCreated: vdCtr.onControllerCreated,
-                          ),
-                        )
+                        vdCtr.isOffline
+                            ? const Center(
+                                child: Text('离线模式不加载评论'),
+                              )
+                            : Obx(
+                                () => VideoReplyPanel(
+                                  bvid: vdCtr.bvid,
+                                  oid: vdCtr.oid.value,
+                                  onControllerCreated:
+                                      vdCtr.onControllerCreated,
+                                ),
+                              )
                       ],
                     ),
                   ),

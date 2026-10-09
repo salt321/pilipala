@@ -152,6 +152,23 @@ class _VideoInfoState extends State<VideoInfo> with TickerProviderStateMixin {
   late ExpandableController _expandableCtr;
   final OfflineCacheService _offlineCacheService = OfflineCacheService.instance;
 
+  ({String title, int durationSeconds}) _resolveOfflineCacheMetadata(
+    VideoDetailData detail,
+  ) {
+    Part? currentPart;
+    for (final Part part in detail.pages ?? const <Part>[]) {
+      if (part.cid == videoDetailCtr.cid.value) {
+        currentPart = part;
+        break;
+      }
+    }
+    final String partTitle = currentPart?.pagePart?.trim() ?? '';
+    return (
+      title: partTitle.isNotEmpty ? partTitle : detail.title ?? '未知视频',
+      durationSeconds: currentPart?.duration ?? detail.duration ?? 0,
+    );
+  }
+
   void Function()? handleState(Future<dynamic> Function() action) {
     return isProcessing
         ? null
@@ -179,20 +196,35 @@ class _VideoInfoState extends State<VideoInfo> with TickerProviderStateMixin {
 
   Future<void> _startOfflineCache() async {
     final VideoDetailData detail = videoIntroController.videoDetail.value;
+    final metadata = _resolveOfflineCacheMetadata(detail);
     final bool completed = await _offlineCacheService.download(
       bvid: videoDetailCtr.bvid,
       cid: videoDetailCtr.cid.value,
-      title: detail.title ?? '未知视频',
+      title: metadata.title,
       ownerName: detail.owner?.name ?? '',
       coverUrl: detail.pic ?? '',
       videoUrl: videoDetailCtr.videoUrl,
       audioUrl: videoDetailCtr.audioUrl,
       qualityLabel: videoDetailCtr.currentVideoQa.description as String,
-      durationSeconds: detail.duration ?? 0,
+      durationSeconds: metadata.durationSeconds,
     );
     if (completed) {
       SmartDialog.showToast('已保存到离线缓存');
     }
+  }
+
+  Future<void> _refreshOfflineMetadataAndOpen() async {
+    final VideoDetailData detail = videoIntroController.videoDetail.value;
+    final metadata = _resolveOfflineCacheMetadata(detail);
+    await _offlineCacheService.updateMetadata(
+      cacheKey: OfflineMediaItem.makeCacheKey(
+        videoDetailCtr.bvid,
+        videoDetailCtr.cid.value,
+      ),
+      title: metadata.title,
+      durationSeconds: metadata.durationSeconds,
+    );
+    Get.toNamed('/offlineMedia');
   }
 
   Widget _buildOfflineCacheButton(BuildContext context) {
@@ -243,7 +275,7 @@ class _VideoInfoState extends State<VideoInfo> with TickerProviderStateMixin {
             onTap: downloading
                 ? () => _offlineCacheService.cancel(cacheKey)
                 : downloaded
-                    ? () => Get.toNamed('/offlineMedia')
+                    ? _refreshOfflineMetadataAndOpen
                     : sourceReady
                         ? () async {
                             try {

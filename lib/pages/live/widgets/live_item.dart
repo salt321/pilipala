@@ -20,7 +20,8 @@ class LiveCardV extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    String heroTag = Utils.makeHeroTag(liveItem.roomId);
+    final int? roomId = liveItem.roomId;
+    final String heroTag = Utils.makeHeroTag(roomId ?? 'invalid-live-room');
     return InkWell(
       onLongPress: () => imageSaveDialog(
         context,
@@ -29,7 +30,11 @@ class LiveCardV extends StatelessWidget {
       ),
       borderRadius: BorderRadius.circular(16),
       onTap: () async {
-        Get.toNamed('/liveRoom?roomid=${liveItem.roomId}',
+        if (roomId == null || roomId <= 0) {
+          SmartDialog.showToast('直播间信息不完整，请刷新后重试');
+          return;
+        }
+        Get.toNamed('/liveRoom?roomid=$roomId',
             arguments: {'liveItem': liveItem, 'heroTag': heroTag});
       },
       child: Column(
@@ -46,7 +51,7 @@ class LiveCardV extends StatelessWidget {
                     Hero(
                       tag: heroTag,
                       child: NetworkImgLayer(
-                        src: liveItem.cover!,
+                        src: liveItem.cover,
                         width: maxWidth,
                         height: maxHeight,
                       ),
@@ -95,7 +100,7 @@ class LiveContent extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              liveItem.title,
+              liveItem.title ?? '未命名直播',
               textAlign: TextAlign.start,
               style: const TextStyle(
                 fontWeight: FontWeight.w500,
@@ -109,7 +114,7 @@ class LiveContent extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    liveItem.uname,
+                    liveItem.uname ?? '未知主播',
                     textAlign: TextAlign.start,
                     style: TextStyle(
                       fontSize:
@@ -122,7 +127,7 @@ class LiveContent extends StatelessWidget {
                 ),
                 if (crossAxisCount == 1) ...[
                   Text(
-                    ' • ${liveItem!.areaName!}',
+                    ' • ${liveItem.areaName ?? '未知分区'}',
                     style: TextStyle(
                       fontSize:
                           Theme.of(context).textTheme.labelMedium!.fontSize,
@@ -130,7 +135,7 @@ class LiveContent extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    ' • ${liveItem!.watchedShow!['text_small']}人观看',
+                    ' • ${liveItem.watchedShow?['text_small'] ?? '观看人数未知'}',
                     style: TextStyle(
                       fontSize:
                           Theme.of(context).textTheme.labelMedium!.fontSize,
@@ -157,6 +162,9 @@ class VideoStat extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final String areaName = liveItem?.areaName ?? '未知分区';
+    final String watchedText =
+        liveItem?.watchedShow?['text_small']?.toString() ?? '观看人数未知';
     return Container(
       height: 50,
       padding: const EdgeInsets.only(top: 26, left: 10, right: 10),
@@ -175,11 +183,11 @@ class VideoStat extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
-            liveItem!.areaName!,
+            areaName,
             style: const TextStyle(fontSize: 11, color: Colors.white),
           ),
           Text(
-            liveItem!.watchedShow!['text_small'],
+            watchedText,
             style: const TextStyle(fontSize: 11, color: Colors.white),
           ),
         ],

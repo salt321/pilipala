@@ -73,7 +73,9 @@ class VideoIntroController extends GetxController {
     lastPlayCid.value = int.parse(Get.parameters['cid']!);
     isShowOnlineTotal =
         setting.get(SettingBoxKey.enableOnlineTotal, defaultValue: false);
-    if (isShowOnlineTotal) {
+    final bool isOffline = Get.arguments is Map &&
+        (Get.arguments as Map)['sourceType'] == 'offline';
+    if (isShowOnlineTotal && !isOffline) {
       queryOnlineTotal();
       startTimer(); // 在页面加载时启动定时器
     }

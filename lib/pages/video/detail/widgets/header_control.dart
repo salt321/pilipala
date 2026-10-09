@@ -64,7 +64,9 @@ class _HeaderControlState extends State<HeaderControl> {
   @override
   void initState() {
     super.initState();
-    videoInfo = widget.videoDetailCtr!.data;
+    videoInfo = widget.videoDetailCtr!.isOffline
+        ? PlayUrlModel()
+        : widget.videoDetailCtr!.data;
     speedsList = widget.controller!.speedsList;
     fullScreenStatusListener();
     heroTag = Get.arguments['heroTag'];
@@ -145,17 +147,19 @@ class _HeaderControlState extends State<HeaderControl> {
                     //     ),
                     //   ),
                     // ),
-                    ListTile(
-                      onTap: () async {
-                        final res = await UserHttp.toViewLater(
-                            bvid: widget.videoDetailCtr!.bvid);
-                        SmartDialog.showToast(res['msg']);
-                        Get.back();
-                      },
-                      dense: true,
-                      leading: const Icon(Icons.watch_later_outlined, size: 20),
-                      title: const Text('添加至「稍后再看」', style: titleStyle),
-                    ),
+                    if (!widget.videoDetailCtr!.isOffline)
+                      ListTile(
+                        onTap: () async {
+                          final res = await UserHttp.toViewLater(
+                              bvid: widget.videoDetailCtr!.bvid);
+                          SmartDialog.showToast(res['msg']);
+                          Get.back();
+                        },
+                        dense: true,
+                        leading:
+                            const Icon(Icons.watch_later_outlined, size: 20),
+                        title: const Text('添加至「稍后再看」', style: titleStyle),
+                      ),
                     ListTile(
                       onTap: () => {Get.back(), scheduleExit()},
                       dense: true,
@@ -163,16 +167,19 @@ class _HeaderControlState extends State<HeaderControl> {
                           const Icon(Icons.hourglass_top_outlined, size: 20),
                       title: const Text('定时关闭', style: titleStyle),
                     ),
-                    ListTile(
-                      onTap: () => {Get.back(), showSetVideoQa()},
-                      dense: true,
-                      leading: const Icon(Icons.play_circle_outline, size: 20),
-                      title: const Text('选择画质', style: titleStyle),
-                      subtitle: Text(
-                          '当前画质 ${widget.videoDetailCtr!.currentVideoQa.description}',
-                          style: subTitleStyle),
-                    ),
-                    if (widget.videoDetailCtr!.currentAudioQa != null)
+                    if (!widget.videoDetailCtr!.isOffline)
+                      ListTile(
+                        onTap: () => {Get.back(), showSetVideoQa()},
+                        dense: true,
+                        leading:
+                            const Icon(Icons.play_circle_outline, size: 20),
+                        title: const Text('选择画质', style: titleStyle),
+                        subtitle: Text(
+                            '当前画质 ${widget.videoDetailCtr!.currentVideoQa.description}',
+                            style: subTitleStyle),
+                      ),
+                    if (!widget.videoDetailCtr!.isOffline &&
+                        widget.videoDetailCtr!.currentAudioQa != null)
                       ListTile(
                         onTap: () => {Get.back(), showSetAudioQa()},
                         dense: true,
@@ -182,7 +189,8 @@ class _HeaderControlState extends State<HeaderControl> {
                             '当前音质 ${widget.videoDetailCtr!.currentAudioQa!.description}',
                             style: subTitleStyle),
                       ),
-                    if (widget.videoDetailCtr!.currentDecodeFormats != null)
+                    if (!widget.videoDetailCtr!.isOffline &&
+                        widget.videoDetailCtr!.currentDecodeFormats != null)
                       ListTile(
                         onTap: () => {Get.back(), showSetDecodeFormats()},
                         dense: true,
@@ -200,12 +208,13 @@ class _HeaderControlState extends State<HeaderControl> {
                       subtitle: Text(widget.controller!.playRepeat.description,
                           style: subTitleStyle),
                     ),
-                    ListTile(
-                      onTap: () => {Get.back(), showSetDanmaku()},
-                      dense: true,
-                      leading: const Icon(Icons.subtitles_outlined, size: 20),
-                      title: const Text('弹幕设置', style: titleStyle),
-                    ),
+                    if (!widget.videoDetailCtr!.isOffline)
+                      ListTile(
+                        onTap: () => {Get.back(), showSetDanmaku()},
+                        dense: true,
+                        leading: const Icon(Icons.subtitles_outlined, size: 20),
+                        title: const Text('弹幕设置', style: titleStyle),
+                      ),
                   ],
                 ),
               ))
@@ -1196,7 +1205,11 @@ class _HeaderControlState extends State<HeaderControl> {
                   constraints: const BoxConstraints(maxWidth: 200),
                   child: Obx(
                     () => Text(
-                      videoIntroController.videoDetail.value.title ?? '',
+                      widget.videoDetailCtr!.isOffline
+                          ? widget.videoDetailCtr!.offlineCurrentItem.value
+                                  ?.title ??
+                              ''
+                          : videoIntroController.videoDetail.value.title ?? '',
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 16,
@@ -1240,23 +1253,24 @@ class _HeaderControlState extends State<HeaderControl> {
           //   ),
           //   fuc: () => _.screenshot(),
           // ),
-          ComBtn(
-            icon: const Icon(
-              Icons.cast,
-              size: 19,
-              color: Colors.white,
+          if (!widget.videoDetailCtr!.isOffline)
+            ComBtn(
+              icon: const Icon(
+                Icons.cast,
+                size: 19,
+                color: Colors.white,
+              ),
+              fuc: () async {
+                showDialog<void>(
+                  context: context,
+                  builder: (BuildContext context) {
+                    return LiveDlnaPage(
+                        datasource: widget.videoDetailCtr!.videoUrl);
+                  },
+                );
+              },
             ),
-            fuc: () async {
-              showDialog<void>(
-                context: context,
-                builder: (BuildContext context) {
-                  return LiveDlnaPage(
-                      datasource: widget.videoDetailCtr!.videoUrl);
-                },
-              );
-            },
-          ),
-          if (isFullScreen.value) ...[
+          if (isFullScreen.value && !widget.videoDetailCtr!.isOffline) ...[
             SizedBox(
               width: 56,
               height: 34,
@@ -1294,7 +1308,8 @@ class _HeaderControlState extends State<HeaderControl> {
             ),
           ],
           SizedBox(width: buttonSpace),
-          if (Platform.isAndroid) ...<Widget>[
+          if (Platform.isAndroid &&
+              !widget.videoDetailCtr!.isOffline) ...<Widget>[
             SizedBox(
               width: 34,
               height: 34,
@@ -1329,7 +1344,8 @@ class _HeaderControlState extends State<HeaderControl> {
           ],
 
           /// 字幕
-          if (widget.showSubtitleBtn ?? true)
+          if ((widget.showSubtitleBtn ?? true) &&
+              !widget.videoDetailCtr!.isOffline)
             ComBtn(
               icon: const Icon(
                 Icons.closed_caption_off,

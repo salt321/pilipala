@@ -82,11 +82,23 @@ class _LivePageState extends State<LivePage>
                 future: _futureBuilderFuture,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.done) {
-                    if (snapshot.data == null) {
-                      return const SliverToBoxAdapter(child: SizedBox());
+                    if (snapshot.hasError) {
+                      debugPrint(
+                        'Live list load failed: ${snapshot.error.runtimeType}',
+                      );
+                      return HttpError(
+                        errMsg: '直播数据解析失败，请重试',
+                        fn: _retryLiveList,
+                      );
                     }
-                    Map data = snapshot.data as Map;
-                    if (data['status']) {
+                    final dynamic snapshotData = snapshot.data;
+                    if (snapshotData is! Map) {
+                      return HttpError(
+                        errMsg: '直播数据格式异常，请重试',
+                        fn: _retryLiveList,
+                      );
+                    }
+                    if (snapshotData['status'] == true) {
                       return SliverLayoutBuilder(
                           builder: (context, boxConstraints) {
                         return Obx(() => contentGrid(
@@ -94,13 +106,8 @@ class _LivePageState extends State<LivePage>
                       });
                     } else {
                       return HttpError(
-                        errMsg: data['msg'],
-                        fn: () {
-                          setState(() {
-                            _futureBuilderFuture =
-                                _liveController.queryLiveList('init');
-                          });
-                        },
+                        errMsg: snapshotData['msg']?.toString() ?? '直播加载失败',
+                        fn: _retryLiveList,
                       );
                     }
                   } else {
@@ -113,6 +120,12 @@ class _LivePageState extends State<LivePage>
         ),
       ),
     );
+  }
+
+  void _retryLiveList() {
+    setState(() {
+      _futureBuilderFuture = _liveController.queryLiveList('init');
+    });
   }
 
   Widget contentGrid(ctr, liveList) {
@@ -195,11 +208,20 @@ class _LivePageState extends State<LivePage>
               future: _futureBuilderFuture2,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.done) {
-                  if (snapshot.data == null) {
-                    return const SizedBox();
+                  if (snapshot.hasError || snapshot.data is! Map) {
+                    if (snapshot.hasError) {
+                      debugPrint(
+                        'Following live load failed: '
+                        '${snapshot.error.runtimeType}',
+                      );
+                    }
+                    return const SizedBox(
+                      height: 80,
+                      child: Center(child: Text('关注直播加载失败')),
+                    );
                   }
-                  Map? data = snapshot.data;
-                  if (data?['status']) {
+                  final Map data = snapshot.data as Map;
+                  if (data['status'] == true) {
                     RxList list = _liveController.liveFollowingList;
                     // ignore: invalid_use_of_protected_member
                     return Obx(() => LiveFollowingListView(list: list.value));
@@ -208,7 +230,7 @@ class _LivePageState extends State<LivePage>
                       height: 80,
                       child: Center(
                         child: Text(
-                          data?['msg'] ?? '',
+                          data['msg']?.toString() ?? '',
                           style: TextStyle(
                             color: Theme.of(context).colorScheme.outline,
                             fontSize: 12,

@@ -6,6 +6,7 @@ import 'package:get/get.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pilipala/http/constants.dart';
 import 'package:pilipala/models/offline_media.dart';
+import 'package:pilipala/services/offline_playlist_service.dart';
 
 class OfflineCacheService {
   OfflineCacheService._();
@@ -266,6 +267,37 @@ class OfflineCacheService {
     return items;
   }
 
+  Future<void> updateMetadata({
+    required String cacheKey,
+    required String title,
+    required int durationSeconds,
+  }) async {
+    await ensureInitialized();
+    final Directory root = await _getRootDirectory();
+    final File manifest = File(
+      '${root.path}${Platform.pathSeparator}$cacheKey'
+      '${Platform.pathSeparator}$_manifestName',
+    );
+    if (!await manifest.exists()) return;
+    try {
+      final Map<String, dynamic> json =
+          jsonDecode(await manifest.readAsString()) as Map<String, dynamic>;
+      final OfflineMediaItem current = OfflineMediaItem.fromJson(json);
+      if (current.title == title &&
+          current.durationSeconds == durationSeconds) {
+        return;
+      }
+      final OfflineMediaItem updated = current.copyWith(
+        title: title,
+        durationSeconds: durationSeconds,
+      );
+      await manifest.writeAsString(jsonEncode(updated.toJson()), flush: true);
+      revision.value++;
+    } catch (_) {
+      // 损坏的 manifest 继续由缓存扫描逻辑处理，不覆盖原文件。
+    }
+  }
+
   Future<void> delete(String cacheKey) async {
     final Directory root = await _getRootDirectory();
     final Directory directory = Directory(
@@ -273,6 +305,7 @@ class OfflineCacheService {
     );
     if (await directory.exists()) await directory.delete(recursive: true);
     completedKeys.remove(cacheKey);
+    await OfflinePlaylistService.instance.removeCacheKey(cacheKey);
     revision.value++;
   }
 }

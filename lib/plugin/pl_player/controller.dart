@@ -101,6 +101,7 @@ class PlPlayerController {
   int _heartDuration = 0;
   bool _enableHeart = true;
   bool _isFirstTime = true;
+  bool _durationIsAuthoritative = false;
 
   Timer? _timer;
   Timer? _timerForSeek;
@@ -328,6 +329,7 @@ class PlPlayerController {
     double? width,
     double? height,
     Duration? duration,
+    bool durationIsAuthoritative = false,
     // 方向
     String? direction,
     // 记录历史记录
@@ -353,6 +355,9 @@ class PlPlayerController {
       _cid = cid;
       _enableHeart = enableHeart;
       _isFirstTime = isFirstTime;
+      _durationIsAuthoritative = durationIsAuthoritative &&
+          duration != null &&
+          duration > Duration.zero;
       _subTitleOpen.value = enableSubTitle;
       subtitles = [].obs;
       subtitleContent.value = '';
@@ -584,8 +589,9 @@ class PlPlayerController {
           makeHeartBeat(event.inSeconds);
         }),
         videoPlayerController!.stream.duration.listen((event) {
-          if (event > Duration.zero) {
+          if (event > Duration.zero && !_durationIsAuthoritative) {
             duration.value = event;
+            updateDurationSecond();
           }
         }),
         videoPlayerController!.stream.buffer.listen((event) {

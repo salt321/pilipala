@@ -83,8 +83,6 @@ class Routes {
     //
     CustomGetPage(name: '/media', page: () => const MediaPage()),
     CustomGetPage(name: '/offlineMedia', page: () => const OfflineMediaPage()),
-    CustomGetPage(
-        name: '/offlinePlayer', page: () => const OfflinePlayerPage()),
     //
     CustomGetPage(name: '/fav', page: () => const FavPage()),
     //
