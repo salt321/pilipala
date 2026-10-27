@@ -47,45 +47,48 @@ class _OfflinePlaylistEditorSheetState
     final selected = await showDialog<List<OfflineMediaItem>>(
         context: context, builder: (_) => OfflineMediaSelector(items: choices));
     if (!mounted || selected == null) return;
-    if (action == 'delete') {
+    if (action == 'delete' || (action == 'remove' && selected.length > 1)) {
       final confirmed = await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
-                  title: Text('删除 ${selected.length} 个缓存？'),
-                  content: const Text(
-                      '将停止当前播放并永久删除本地文件，同时清理所有列表中的对应引用。已删除的缓存不能通过取消编辑恢复。'),
+                  title: Text(action == 'delete'
+                      ? '删除 ${selected.length} 个缓存？'
+                      : '删除 ${selected.length} 个列表项目？'),
+                  content: Text(action == 'delete'
+                      ? '将停止当前播放并永久删除本地文件，同时清理所有列表中的对应引用。此操作无法撤销。'
+                      : '将从当前列表删除所选项目并自动保存，本地缓存文件仍保留。'),
                   actions: [
                     TextButton(
                         onPressed: () => Navigator.pop(context, false),
                         child: const Text('取消')),
                     FilledButton(
                         onPressed: () => Navigator.pop(context, true),
-                        child: const Text('删除缓存'))
+                        child: Text(action == 'delete' ? '删除缓存' : '确认删除'))
                   ]));
       if (!mounted || confirmed != true) return;
+    }
+    if (action != 'delete') {
+      final removed = selected.map((e) => e.cacheKey).toSet();
+      final next = action == 'add'
+          ? [..._items, ...selected]
+          : _items.where((e) => !removed.contains(e.cacheKey)).toList();
+      await _persistItems(next);
+      return;
     }
     setState(() => _saving = true);
     final current = _items.isEmpty ? null : _items[_startIndex].cacheKey;
     try {
-      if (action == 'add') {
-        _items.addAll(selected);
-      } else if (action == 'delete') {
-        // Stop releases the media source before deleting shared cache files.
-        await PlPlayerController(videoType: 'none')
-            .videoPlayerController
-            ?.stop();
-        for (final item in selected) {
-          await widget.onDeleteCache!(item);
-          _items.removeWhere((e) => e.cacheKey == item.cacheKey);
-        }
-      } else {
-        final removed = selected.map((e) => e.cacheKey).toSet();
-        _items.removeWhere((e) => removed.contains(e.cacheKey));
+      // Stop releases the media source before deleting shared cache files.
+      await PlPlayerController(videoType: 'none').videoPlayerController?.stop();
+      for (final item in selected) {
+        await widget.onDeleteCache!(item);
+        _items.removeWhere((e) => e.cacheKey == item.cacheKey);
       }
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(const SnackBar(content: Text('操作未全部完成，请检查剩余项目后重试')));
+      }
     } finally {
       final index = _items.indexWhere((e) => e.cacheKey == current);
       _startIndex = index < 0 ? 0 : index;
@@ -94,39 +97,37 @@ class _OfflinePlaylistEditorSheetState
   }
 
   void _reorder(int oldIndex, int newIndex) {
-    setState(() {
-      if (newIndex > oldIndex) newIndex--;
-      final OfflineMediaItem? selected =
-          _items.isEmpty ? null : _items[_startIndex];
-      final OfflineMediaItem item = _items.removeAt(oldIndex);
-      _items.insert(newIndex, item);
-      _startIndex = selected == null ? 0 : _items.indexOf(selected);
-    });
+    if (_saving) return;
+    if (newIndex > oldIndex) newIndex--;
+    if (oldIndex == newIndex) return;
+    final next = List<OfflineMediaItem>.of(_items);
+    next.insert(newIndex, next.removeAt(oldIndex));
+    _persistItems(next);
   }
 
   void _remove(int index) {
-    setState(() {
-      _items.removeAt(index);
-      if (_items.isEmpty) {
-        _startIndex = 0;
-      } else if (_startIndex >= _items.length) {
-        _startIndex = _items.length - 1;
-      } else if (index < _startIndex) {
-        _startIndex--;
-      }
-    });
+    if (_saving) return;
+    _persistItems(List<OfflineMediaItem>.of(_items)..removeAt(index));
   }
 
-  Future<void> _save() async {
+  /// Commit before replacing the visible list; a failed write is not success.
+  Future<void> _persistItems(List<OfflineMediaItem> next) async {
     if (_saving) return;
+    final current = _items.isEmpty ? null : _items[_startIndex].cacheKey;
     setState(() => _saving = true);
     try {
-      await widget.onSave(List.of(_items));
-      if (mounted) Navigator.pop(context);
+      await widget.onSave(List.of(next));
+      if (!mounted) return;
+      _items
+        ..clear()
+        ..addAll(next);
+      final index = _items.indexWhere((item) => item.cacheKey == current);
+      _startIndex = index < 0 ? 0 : index;
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('保存失败，请重试')));
+            .showSnackBar(const SnackBar(content: Text('自动保存失败，请重新打开列表检查')));
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -173,13 +174,14 @@ class _OfflinePlaylistEditorSheetState
                       ),
                     ),
                     const Divider(height: 1),
+                    if (_saving) const LinearProgressIndicator(),
                     Wrap(children: [
                       TextButton(
                           onPressed: () => _manageItems('add'),
-                          child: const Text('批量添加')),
+                          child: const Text('添加')),
                       TextButton(
                           onPressed: () => _manageItems('remove'),
-                          child: const Text('批量移除')),
+                          child: const Text('删除')),
                       if (widget.onDeleteCache != null)
                         TextButton(
                             onPressed: () => _manageItems('delete'),
@@ -241,20 +243,6 @@ class _OfflinePlaylistEditorSheetState
                       padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
                       child: Row(
                         children: [
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: _saving ? null : _save,
-                              icon: _saving
-                                  ? const SizedBox.square(
-                                      dimension: 18,
-                                      child: CircularProgressIndicator(
-                                          strokeWidth: 2),
-                                    )
-                                  : const Icon(Icons.save_outlined),
-                              label: const Text('保存修改'),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
                           Expanded(
                             child: FilledButton.icon(
                               onPressed: _items.isEmpty

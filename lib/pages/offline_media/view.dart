@@ -106,6 +106,9 @@ class _OfflineMediaPageState extends State<OfflineMediaPage> {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
+      // Close explicitly so an in-flight automatic save cannot be dismissed.
+      isDismissible: false,
+      enableDrag: false,
       builder: (_) => OfflinePlaylistEditorSheet(
         playlist: playlist,
         items: items,
