@@ -6,6 +6,7 @@ import 'package:pilipala/models/offline_media.dart';
 import 'package:pilipala/models/offline_playlist.dart';
 import 'package:pilipala/pages/offline_media/controller.dart';
 import 'package:pilipala/pages/offline_media/playlist_editor.dart';
+import 'package:pilipala/pages/offline_media/media_selector.dart';
 import 'package:pilipala/utils/utils.dart';
 
 class OfflineMediaPage extends StatefulWidget {
@@ -61,145 +62,41 @@ class _OfflineMediaPageState extends State<OfflineMediaPage> {
   }
 
   Future<void> _showCreatePlaylist() async {
-    if (_controller.mediaList.isEmpty) {
-      Get.snackbar('无法创建', '请先缓存至少一个视频');
-      return;
-    }
-    final TextEditingController nameController = TextEditingController();
-    final Set<String> selected = {};
-    String query = '';
-    int days = 0;
-    int length = 0;
-    final DateTime now = DateTime.now();
-    final bool? confirmed = await showDialog<bool>(
+    final items = await showDialog<List<OfflineMediaItem>>(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          final visible = _controller.mediaList.where((item) {
-            return item.title.toLowerCase().contains(query.toLowerCase()) &&
-                (days == 0 ||
-                    !item.createdAt
-                        .isBefore(now.subtract(Duration(days: days)))) &&
-                (length == 0 ||
-                    (length == 1 && item.durationSeconds < 600) ||
-                    (length == 2 &&
-                        item.durationSeconds >= 600 &&
-                        item.durationSeconds < 1800) ||
-                    (length == 3 && item.durationSeconds >= 1800));
-          }).toList(growable: false);
-          return AlertDialog(
-            title: const Text('新建本地播放列表'),
-            content: SizedBox(
-              width: 520,
-              height: MediaQuery.sizeOf(context).height * 0.55,
-              child: Column(
-                children: [
-                  TextField(
-                    controller: nameController,
-                    autofocus: true,
-                    maxLength: 40,
-                    decoration: const InputDecoration(
-                      labelText: '列表名称',
-                      hintText: '例如：通勤播放列表',
-                    ),
-                  ),
-                  TextField(
-                    decoration: const InputDecoration(
-                        labelText: '按视频名称筛选', prefixIcon: Icon(Icons.search)),
-                    onChanged: (value) =>
-                        setDialogState(() => query = value.trim()),
-                  ),
-                  Wrap(
-                    spacing: 12,
-                    children: [
-                      DropdownButton<int>(
-                        value: days,
-                        items: const [
-                          DropdownMenuItem(value: 0, child: Text('全部缓存时间')),
-                          DropdownMenuItem(value: 7, child: Text('最近7天')),
-                          DropdownMenuItem(value: 30, child: Text('最近30天')),
-                        ],
-                        onChanged: (value) =>
-                            setDialogState(() => days = value ?? 0),
-                      ),
-                      DropdownButton<int>(
-                        value: length,
-                        items: const [
-                          DropdownMenuItem(value: 0, child: Text('全部时长')),
-                          DropdownMenuItem(value: 1, child: Text('10分钟以内')),
-                          DropdownMenuItem(value: 2, child: Text('10–30分钟')),
-                          DropdownMenuItem(value: 3, child: Text('30分钟及以上')),
-                        ],
-                        onChanged: (value) =>
-                            setDialogState(() => length = value ?? 0),
-                      ),
-                      TextButton(
-                        onPressed: () => setDialogState(() => selected
-                            .addAll(visible.map((item) => item.cacheKey))),
-                        child: Text('全选结果（${visible.length}）'),
-                      ),
-                      TextButton(
-                        onPressed: () => setDialogState(() => selected
-                            .removeAll(visible.map((item) => item.cacheKey))),
-                        child: const Text('取消选择结果'),
-                      ),
-                    ],
-                  ),
-                  Expanded(
-                    child: ListView.builder(
-                      itemCount: visible.length,
-                      itemBuilder: (context, index) {
-                        final OfflineMediaItem item = visible[index];
-                        return CheckboxListTile(
-                          value: selected.contains(item.cacheKey),
-                          onChanged: (checked) {
-                            setDialogState(() {
-                              if (checked == true) {
-                                selected.add(item.cacheKey);
-                              } else {
-                                selected.remove(item.cacheKey);
-                              }
-                            });
-                          },
-                          title: Text(
-                            item.title,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          subtitle: Text(item.ownerName),
-                          controlAffinity: ListTileControlAffinity.leading,
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('取消'),
-              ),
-              FilledButton(
-                onPressed: selected.isEmpty
-                    ? null
-                    : () => Navigator.pop(context, true),
-                child: Text('创建（${selected.length}）'),
-              ),
-            ],
-          );
-        },
-      ),
+      builder: (_) =>
+          OfflineMediaSelector(items: List.of(_controller.mediaList)),
     );
-    final String name = nameController.text;
-    nameController.dispose();
-    if (confirmed == true && mounted) {
-      await _controller.createPlaylist(
-        name,
-        _controller.mediaList
-            .where((item) => selected.contains(item.cacheKey))
-            .map((item) => item.cacheKey),
+    if (items == null || !mounted) return;
+    final nameController = TextEditingController();
+    try {
+      final name = await showDialog<String>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('新建本地播放列表'),
+          content: TextField(
+              controller: nameController,
+              maxLength: 40,
+              decoration: const InputDecoration(labelText: '列表名称')),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('取消')),
+            FilledButton(
+                onPressed: () {
+                  if (nameController.text.trim().isNotEmpty)
+                    Navigator.pop(context, nameController.text.trim());
+                },
+                child: const Text('创建')),
+          ],
+        ),
       );
+      if (name != null && mounted)
+        await _controller.createPlaylist(name, items.map((e) => e.cacheKey));
+    } catch (_) {
+      Get.snackbar('创建失败', '未能保存列表，请重试');
+    } finally {
+      nameController.dispose();
     }
   }
 
@@ -212,6 +109,8 @@ class _OfflineMediaPageState extends State<OfflineMediaPage> {
       builder: (_) => OfflinePlaylistEditorSheet(
         playlist: playlist,
         items: items,
+        availableItems: List.of(_controller.mediaList),
+        onDeleteCache: _controller.delete,
         onSave: (items) => _controller.updatePlaylist(playlist, items),
         onPlay: (startIndex, items) => _controller.playPlaylist(
           playlist,
