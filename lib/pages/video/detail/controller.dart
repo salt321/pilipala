@@ -12,6 +12,8 @@ import 'package:pilipala/http/video.dart';
 import 'package:pilipala/models/common/reply_type.dart';
 import 'package:pilipala/models/common/search_type.dart';
 import 'package:pilipala/models/offline_media.dart';
+import 'package:pilipala/models/offline_playlist.dart';
+import 'package:pilipala/models/offline_playback_queue.dart';
 import 'package:pilipala/models/video/later.dart';
 import 'package:pilipala/models/video/play/quality.dart';
 import 'package:pilipala/models/video/play/url.dart';
@@ -49,6 +51,8 @@ class VideoDetailController extends GetxController
   final Rxn<OfflineMediaItem> offlineCurrentItem = Rxn<OfflineMediaItem>();
   final List<OfflineMediaItem> offlineItems = [];
   int offlineCurrentIndex = 0;
+  late OfflinePlaybackQueue offlineQueue;
+  bool _offlineSwitching = false;
 
   bool get isOffline => sourceType.value == 'offline';
 
@@ -198,6 +202,11 @@ class VideoDetailController extends GetxController
       offlineCurrentIndex =
           (argMap['startIndex'] as int? ?? 0).clamp(0, offlineItems.length - 1);
       offlineCurrentItem.value = offlineItems[offlineCurrentIndex];
+      offlineQueue = OfflinePlaybackQueue(
+        length: offlineItems.length,
+        startIndex: offlineCurrentIndex,
+        mode: OfflinePlayMode.fromValue(argMap['offlinePlayMode']),
+      );
       watchLaterTitle.value = argMap['playlistTitle'] as String? ?? '离线缓存';
       tabs.assignAll(const ['离线详情', '评论']);
       autoPlay.value = true;
@@ -545,23 +554,35 @@ class VideoDetailController extends GetxController
     return {'status': true, 'data': item};
   }
 
-  Future<bool> playOfflineAdjacent(int offset) async {
-    if (!isOffline || offlineItems.isEmpty) return false;
-    int target = offlineCurrentIndex + offset;
-    if (target < 0 || target >= offlineItems.length) {
-      if (plPlayerController.playRepeat != PlayRepeat.listCycle) return false;
-      target = target < 0 ? offlineItems.length - 1 : 0;
+  Future<bool> playOfflineAdjacent(int offset, {bool automatic = false}) async {
+    if (!isOffline || offlineItems.isEmpty || _offlineSwitching || isClosed) {
+      return false;
     }
-    offlineCurrentIndex = target;
+    final target = offset < 0
+        ? offlineQueue.peekPrevious()
+        : offlineQueue.peekNext(automatic: automatic);
+    if (target == null) return false;
+    _offlineSwitching = true;
+    final previous = offlineCurrentIndex;
     offlineCurrentItem.value = offlineItems[target];
-    activePlaylistIndex.value = target;
-    activePlaylistBvid.value = offlineItems[target].bvid;
     try {
       await _initializeOfflineSource();
+      if (isClosed) return false;
+      if (offset < 0) {
+        offlineQueue.commitPrevious();
+      } else {
+        offlineQueue.commitNext(automatic: automatic);
+      }
+      offlineCurrentIndex = target;
+      activePlaylistIndex.value = target;
+      activePlaylistBvid.value = offlineItems[target].bvid;
       return true;
-    } catch (error) {
-      SmartDialog.showToast('无法播放离线项目：$error');
+    } catch (_) {
+      offlineCurrentItem.value = offlineItems[previous];
+      SmartDialog.showToast('无法播放离线项目，请检查缓存文件后重试');
       return false;
+    } finally {
+      _offlineSwitching = false;
     }
   }
 
