@@ -143,10 +143,10 @@ class _VideoDetailPageState extends State<VideoDetailPage>
       shutdownTimerService.handleWaitingFinished();
 
       /// 顺序播放 列表循环
-      if (vdCtr.shouldAutoAdvance) {
-        if (vdCtr.isOffline) {
-          await vdCtr.playOfflineAdjacent(1);
-        } else if (vdCtr.lockMediaPlaylist.value ||
+      if (vdCtr.isOffline) {
+        await vdCtr.playOfflineAdjacent(1, automatic: true);
+      } else if (vdCtr.shouldAutoAdvance) {
+        if (vdCtr.lockMediaPlaylist.value ||
             vdCtr.videoType == SearchType.video) {
           videoIntroController.nextPlay();
         } else if (vdCtr.videoType == SearchType.media_bangumi) {
@@ -155,7 +155,8 @@ class _VideoDetailPageState extends State<VideoDetailPage>
       }
 
       /// 单个循环
-      if (plPlayerController!.playRepeat == PlayRepeat.singleCycle) {
+      if (!vdCtr.isOffline &&
+          plPlayerController!.playRepeat == PlayRepeat.singleCycle) {
         plPlayerController!.seekTo(Duration.zero);
         plPlayerController!.play();
       }

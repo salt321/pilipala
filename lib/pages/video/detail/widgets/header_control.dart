@@ -201,11 +201,15 @@ class _HeaderControlState extends State<HeaderControl> {
                             style: subTitleStyle),
                       ),
                     ListTile(
-                      onTap: () => {Get.back(), showSetRepeat()},
+                      onTap: widget.videoDetailCtr!.isOffline
+                          ? null
+                          : () => {Get.back(), showSetRepeat()},
                       dense: true,
                       leading: const Icon(Icons.repeat, size: 20),
                       title: const Text('播放顺序', style: titleStyle),
-                      subtitle: Text(widget.controller!.playRepeat.description,
+                      subtitle: Text(widget.videoDetailCtr!.isOffline
+                          ? '${widget.videoDetailCtr!.offlineQueue.mode.label}（返回本地列表修改）'
+                          : widget.controller!.playRepeat.description,
                           style: subTitleStyle),
                     ),
                     if (!widget.videoDetailCtr!.isOffline)
