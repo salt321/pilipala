@@ -1,3 +1,18 @@
+enum OfflinePlayMode {
+  sequential('顺序播放'),
+  listRepeat('列表循环'),
+  singleRepeat('单曲循环'),
+  shuffle('随机播放');
+
+  const OfflinePlayMode(this.label);
+  final String label;
+
+  static OfflinePlayMode fromValue(Object? value) => values.firstWhere(
+        (mode) => mode.name == value,
+        orElse: () => sequential,
+      );
+}
+
 class OfflinePlaylist {
   const OfflinePlaylist({
     required this.id,
@@ -5,6 +20,7 @@ class OfflinePlaylist {
     required this.cacheKeys,
     required this.createdAt,
     required this.updatedAt,
+    this.playMode = OfflinePlayMode.sequential,
   });
 
   final String id;
@@ -12,11 +28,13 @@ class OfflinePlaylist {
   final List<String> cacheKeys;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final OfflinePlayMode playMode;
 
   factory OfflinePlaylist.fromJson(Map<String, dynamic> json) {
     return OfflinePlaylist(
       id: json['id'] as String? ?? '',
       name: json['name'] as String? ?? '未命名播放列表',
+      playMode: OfflinePlayMode.fromValue(json['playMode']),
       cacheKeys: (json['cacheKeys'] as List<dynamic>? ?? const [])
           .whereType<String>()
           .toList(growable: false),
@@ -31,6 +49,7 @@ class OfflinePlaylist {
     return {
       'id': id,
       'name': name,
+      'playMode': playMode.name,
       'cacheKeys': cacheKeys,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
@@ -41,6 +60,7 @@ class OfflinePlaylist {
     String? name,
     List<String>? cacheKeys,
     DateTime? updatedAt,
+    OfflinePlayMode? playMode,
   }) {
     return OfflinePlaylist(
       id: id,
@@ -48,6 +68,7 @@ class OfflinePlaylist {
       cacheKeys: cacheKeys ?? this.cacheKeys,
       createdAt: createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      playMode: playMode ?? this.playMode,
     );
   }
 }

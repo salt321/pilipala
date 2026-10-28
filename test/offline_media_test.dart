@@ -5,6 +5,16 @@ import 'package:pilipala/plugin/pl_player/models/data_source.dart';
 import 'package:pilipala/services/offline_playlist_service.dart';
 
 void main() {
+  test('播放模式兼容旧数据及未知值并可完整保存', () {
+    expect(OfflinePlaylist.fromJson({}).playMode, OfflinePlayMode.sequential);
+    expect(OfflinePlaylist.fromJson({'playMode': 'future'}).playMode,
+        OfflinePlayMode.sequential);
+    for (final mode in OfflinePlayMode.values) {
+      final playlist = OfflinePlaylist.fromJson({}).copyWith(playMode: mode);
+      expect(OfflinePlaylist.fromJson(playlist.toJson()).playMode, mode);
+      expect(playlist.copyWith(name: '重命名').playMode, mode);
+    }
+  });
   test('离线媒体缓存键由 bvid 和 cid 唯一确定', () {
     expect(
       OfflineMediaItem.makeCacheKey('BV1test', 123),

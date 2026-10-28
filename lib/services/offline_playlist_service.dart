@@ -82,6 +82,7 @@ class OfflinePlaylistService {
     required String id,
     String? name,
     Iterable<String>? cacheKeys,
+    OfflinePlayMode? playMode,
   }) async {
     await ensureInitialized();
     final int index = _playlists.indexWhere((item) => item.id == id);
@@ -90,6 +91,7 @@ class OfflinePlaylistService {
       name: name == null ? null : _normalizeName(name),
       cacheKeys: cacheKeys == null ? null : _uniqueKeys(cacheKeys),
       updatedAt: DateTime.now(),
+      playMode: playMode,
     );
     await _persist();
   }
