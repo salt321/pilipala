@@ -12,6 +12,7 @@ class OfflinePlaylistEditorSheet extends StatefulWidget {
     required this.items,
     required this.onSave,
     required this.onPlay,
+    required this.onModeChanged,
     this.availableItems = const [],
     this.onDeleteCache,
     super.key,
@@ -22,7 +23,10 @@ class OfflinePlaylistEditorSheet extends StatefulWidget {
   final Future<void> Function(OfflineMediaItem)? onDeleteCache;
   final List<OfflineMediaItem> items;
   final Future<void> Function(List<OfflineMediaItem> items) onSave;
-  final void Function(int startIndex, List<OfflineMediaItem> items) onPlay;
+  final void Function(
+          int startIndex, List<OfflineMediaItem> items, OfflinePlayMode mode)
+      onPlay;
+  final Future<void> Function(OfflinePlayMode mode) onModeChanged;
 
   @override
   State<OfflinePlaylistEditorSheet> createState() =>
@@ -34,7 +38,23 @@ class _OfflinePlaylistEditorSheetState
   late final List<OfflineMediaItem> _items = List.of(widget.items);
   int _startIndex = 0;
   bool _saving = false;
-  bool _shuffle = false;
+  late OfflinePlayMode _playMode = widget.playlist.playMode;
+
+  Future<void> _changePlayMode(OfflinePlayMode? mode) async {
+    if (mode == null || mode == _playMode || _saving) return;
+    setState(() => _saving = true);
+    try {
+      await widget.onModeChanged(mode);
+      if (mounted) setState(() => _playMode = mode);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('播放模式保存失败，请重新打开列表检查')));
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
 
   Future<void> _manageItems(String action) async {
     if (_saving) return;
@@ -187,12 +207,18 @@ class _OfflinePlaylistEditorSheetState
                             onPressed: () => _manageItems('delete'),
                             child: const Text('移除并删除缓存')),
                     ]),
-                    SwitchListTile(
-                      title: const Text('随机播放'),
-                      subtitle: const Text('打乱本次播放队列，保留保存的列表顺序'),
-                      secondary: const Icon(Icons.shuffle),
-                      value: _shuffle,
-                      onChanged: (value) => setState(() => _shuffle = value),
+                    ListTile(
+                      title: const Text('播放模式'),
+                      subtitle: const Text('为此列表自动保存；随机模式一轮内不重复'),
+                      trailing: DropdownButton<OfflinePlayMode>(
+                        value: _playMode,
+                        onChanged: _changePlayMode,
+                        items: [
+                          for (final mode in OfflinePlayMode.values)
+                            DropdownMenuItem(
+                                value: mode, child: Text(mode.label)),
+                        ],
+                      ),
                     ),
                     Expanded(
                       child: _items.isEmpty
@@ -250,14 +276,11 @@ class _OfflinePlaylistEditorSheetState
                                   : () {
                                       final queue =
                                           List<OfflineMediaItem>.of(_items);
-                                      if (_shuffle) queue.shuffle();
                                       widget.onPlay(
-                                          _shuffle ? 0 : _startIndex, queue);
+                                          _startIndex, queue, _playMode);
                                     },
                               icon: const Icon(Icons.play_arrow),
-                              label: Text(_shuffle
-                                  ? '随机播放'
-                                  : '播放第 ${_startIndex + 1} 项'),
+                              label: Text('播放第 ${_startIndex + 1} 项'),
                             ),
                           ),
                         ],

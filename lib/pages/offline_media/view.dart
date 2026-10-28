@@ -115,10 +115,12 @@ class _OfflineMediaPageState extends State<OfflineMediaPage> {
         availableItems: List.of(_controller.mediaList),
         onDeleteCache: _controller.delete,
         onSave: (items) => _controller.updatePlaylist(playlist, items),
-        onPlay: (startIndex, items) => _controller.playPlaylist(
+        onModeChanged: (mode) => _controller.updatePlaylistMode(playlist, mode),
+        onPlay: (startIndex, items, mode) => _controller.playPlaylist(
           playlist,
           items,
           startIndex: startIndex,
+          playMode: mode,
         ),
       ),
     );

@@ -54,20 +54,22 @@ class OfflineMediaController extends GetxController {
     OfflinePlaylist playlist,
     List<OfflineMediaItem> items, {
     int startIndex = 0,
+    OfflinePlayMode playMode = OfflinePlayMode.sequential,
   }) {
     if (items.isEmpty) {
       SmartDialog.showToast('播放列表中没有可用的离线视频');
       return;
     }
     Get.back();
-    _openOfflineVideo(items, startIndex, playlist.name);
+    _openOfflineVideo(items, startIndex, playlist.name, playMode: playMode);
   }
 
   void _openOfflineVideo(
     List<OfflineMediaItem> items,
     int startIndex,
-    String playlistTitle,
-  ) {
+    String playlistTitle, {
+    OfflinePlayMode playMode = OfflinePlayMode.sequential,
+  }) {
     if (items.isEmpty) return;
     final int safeIndex = startIndex.clamp(0, items.length - 1);
     final OfflineMediaItem item = items[safeIndex];
@@ -80,6 +82,7 @@ class OfflineMediaController extends GetxController {
         'offlineItems': List<OfflineMediaItem>.of(items),
         'startIndex': safeIndex,
         'playlistTitle': playlistTitle,
+        'offlinePlayMode': playMode.name,
       },
     );
   }
@@ -109,6 +112,11 @@ class OfflineMediaController extends GetxController {
 
   Future<void> renamePlaylist(OfflinePlaylist playlist, String name) async {
     await playlistService.update(id: playlist.id, name: name);
+  }
+
+  Future<void> updatePlaylistMode(
+      OfflinePlaylist playlist, OfflinePlayMode mode) async {
+    await playlistService.update(id: playlist.id, playMode: mode);
   }
 
   Future<void> deletePlaylist(OfflinePlaylist playlist) async {
