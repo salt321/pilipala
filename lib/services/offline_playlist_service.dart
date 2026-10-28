@@ -8,7 +8,18 @@ import 'package:pilipala/models/offline_media.dart';
 import 'package:pilipala/models/offline_playlist.dart';
 
 class OfflinePlaylistService {
-  OfflinePlaylistService._();
+  OfflinePlaylistService._()
+      : _fileOverride = null,
+        _replaceFile = null;
+
+  /// Isolated storage and a replacement fault seam for persistence tests.
+  OfflinePlaylistService.forTesting(File file,
+      {Future<void> Function(File, String)? replaceFile})
+      : _fileOverride = file,
+        _replaceFile = replaceFile;
+
+  final File? _fileOverride;
+  final Future<void> Function(File, String)? _replaceFile;
 
   static final OfflinePlaylistService instance = OfflinePlaylistService._();
   static const String _fileName = 'playlists.json';
@@ -20,10 +31,15 @@ class OfflinePlaylistService {
   int _idSequence = 0;
 
   Future<void> ensureInitialized() {
-    return _initialization ??= _load();
+    return _initialization ??= _load().onError<Object>((error, stack) {
+      _initialization = null;
+      Error.throwWithStackTrace(error, stack);
+    });
   }
 
   Future<File> _getFile() async {
+    final override = _fileOverride;
+    if (override != null) return override;
     final Directory documents = await getApplicationDocumentsDirectory();
     final Directory directory = Directory(
       '${documents.path}${Platform.pathSeparator}offline_media',
@@ -35,27 +51,30 @@ class OfflinePlaylistService {
   Future<void> _load() async {
     final File file = await _getFile();
     if (!await file.exists()) return;
-    try {
-      final dynamic decoded = jsonDecode(await file.readAsString());
-      if (decoded is! List<dynamic>) return;
-      _playlists
-        ..clear()
-        ..addAll(
-          decoded
-              .whereType<Map>()
-              .map((json) => OfflinePlaylist.fromJson(
-                    Map<String, dynamic>.from(json),
-                  ))
-              .where((playlist) => playlist.id.isNotEmpty),
-        );
-    } catch (_) {
-      // 损坏的列表文件不阻断离线视频播放，下一次修改时会重建。
+    final dynamic decoded = jsonDecode(await file.readAsString());
+    if (decoded is! List<dynamic> ||
+        decoded.any((item) =>
+            item is! Map ||
+            item['id'] is! String ||
+            (item['id'] as String).isEmpty)) {
+      throw const FormatException('Invalid playlist document');
     }
+    // Decode completely before publishing; corrupt data must not be overwritten.
+    final loaded = decoded
+        .map((json) =>
+            OfflinePlaylist.fromJson(Map<String, dynamic>.from(json as Map)))
+        .toList();
+    _playlists
+      ..clear()
+      ..addAll(loaded);
   }
 
   Future<List<OfflinePlaylist>> listPlaylists() async {
     await ensureInitialized();
-    final List<OfflinePlaylist> result = List.of(_playlists);
+    final List<OfflinePlaylist> result = _playlists
+        .map((item) =>
+            item.copyWith(cacheKeys: List.unmodifiable(item.cacheKeys)))
+        .toList();
     result.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
     return result;
   }
@@ -64,7 +83,6 @@ class OfflinePlaylistService {
     required String name,
     required Iterable<String> cacheKeys,
   }) async {
-    await ensureInitialized();
     final DateTime now = DateTime.now();
     final OfflinePlaylist playlist = OfflinePlaylist(
       id: '${now.microsecondsSinceEpoch}_${_idSequence++}',
@@ -73,9 +91,10 @@ class OfflinePlaylistService {
       createdAt: now,
       updatedAt: now,
     );
-    _playlists.add(playlist);
-    await _persist();
-    return playlist;
+    return _mutate((next) {
+      next.add(playlist);
+      return playlist;
+    });
   }
 
   Future<void> update({
@@ -84,38 +103,35 @@ class OfflinePlaylistService {
     Iterable<String>? cacheKeys,
     OfflinePlayMode? playMode,
   }) async {
-    await ensureInitialized();
-    final int index = _playlists.indexWhere((item) => item.id == id);
-    if (index < 0) return;
-    _playlists[index] = _playlists[index].copyWith(
-      name: name == null ? null : _normalizeName(name),
-      cacheKeys: cacheKeys == null ? null : _uniqueKeys(cacheKeys),
-      updatedAt: DateTime.now(),
-      playMode: playMode,
-    );
-    await _persist();
+    final keys = cacheKeys == null ? null : _uniqueKeys(cacheKeys);
+    await _mutate<void>((next) {
+      final int index = next.indexWhere((item) => item.id == id);
+      if (index < 0) throw StateError('Playlist no longer exists');
+      next[index] = next[index].copyWith(
+        name: name == null ? null : _normalizeName(name),
+        cacheKeys: keys,
+        updatedAt: DateTime.now(),
+        playMode: playMode,
+      );
+    });
   }
 
   Future<void> delete(String id) async {
-    await ensureInitialized();
-    final int oldLength = _playlists.length;
-    _playlists.removeWhere((item) => item.id == id);
-    if (_playlists.length != oldLength) await _persist();
+    await _mutate<void>((next) => next.removeWhere((item) => item.id == id));
   }
 
   Future<void> removeCacheKey(String cacheKey) async {
-    await ensureInitialized();
-    bool changed = false;
-    for (int index = 0; index < _playlists.length; index++) {
-      final OfflinePlaylist playlist = _playlists[index];
-      if (!playlist.cacheKeys.contains(cacheKey)) continue;
-      _playlists[index] = playlist.copyWith(
-        cacheKeys: playlist.cacheKeys.where((key) => key != cacheKey).toList(),
-        updatedAt: DateTime.now(),
-      );
-      changed = true;
-    }
-    if (changed) await _persist();
+    await _mutate<void>((next) {
+      for (int index = 0; index < next.length; index++) {
+        final OfflinePlaylist playlist = next[index];
+        if (!playlist.cacheKeys.contains(cacheKey)) continue;
+        next[index] = playlist.copyWith(
+          cacheKeys:
+              playlist.cacheKeys.where((key) => key != cacheKey).toList(),
+          updatedAt: DateTime.now(),
+        );
+      }
+    });
   }
 
   List<OfflineMediaItem> resolveItems(
@@ -137,27 +153,44 @@ class OfflinePlaylistService {
   }
 
   List<String> _uniqueKeys(Iterable<String> keys) {
-    return LinkedHashSet<String>.from(keys.where((key) => key.isNotEmpty))
-        .toList(growable: false);
+    return List.unmodifiable(
+        LinkedHashSet<String>.from(keys.where((key) => key.isNotEmpty)));
   }
 
-  Future<void> _persist() {
-    final List<Map<String, dynamic>> snapshot =
-        _playlists.map((item) => item.toJson()).toList(growable: false);
-    _writeTail = _writeTail.then((_) => _writeSnapshot(snapshot));
-    return _writeTail;
+  Future<T> _mutate<T>(T Function(List<OfflinePlaylist>) change) {
+    final operation = _writeTail.then((_) async {
+      await ensureInitialized();
+      final next = List<OfflinePlaylist>.of(_playlists);
+      final result = change(next);
+      // Mutations replace immutable entries; unchanged identities mean no write.
+      var changed = next.length != _playlists.length;
+      for (var index = 0; !changed && index < next.length; index++) {
+        changed = !identical(next[index], _playlists[index]);
+      }
+      if (!changed) return result;
+      await _writeSnapshot(next.map((item) => item.toJson()).toList());
+      _playlists
+        ..clear()
+        ..addAll(next);
+      revision.value++;
+      return result;
+    });
+    // The caller receives the original failure; only the scheduling tail recovers.
+    _writeTail =
+        operation.then<void>((_) {}, onError: (Object _, StackTrace __) {});
+    return operation;
   }
 
   Future<void> _writeSnapshot(List<Map<String, dynamic>> snapshot) async {
     final File file = await _getFile();
     final File temporary = File('${file.path}.tmp');
     await temporary.writeAsString(jsonEncode(snapshot), flush: true);
-    try {
-      await temporary.rename(file.path);
-    } on FileSystemException {
-      if (await file.exists()) await file.delete();
+    final replace = _replaceFile;
+    if (replace != null) {
+      await replace(temporary, file.path);
+    } else {
+      // Same-directory rename: never delete the last valid file on failure.
       await temporary.rename(file.path);
     }
-    revision.value++;
   }
 }

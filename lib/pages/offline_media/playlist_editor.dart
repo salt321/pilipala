@@ -38,21 +38,52 @@ class _OfflinePlaylistEditorSheetState
   late final List<OfflineMediaItem> _items = List.of(widget.items);
   int _startIndex = 0;
   bool _saving = false;
+  bool _awaitingRetry = false;
   late OfflinePlayMode _playMode = widget.playlist.playMode;
 
   Future<void> _changePlayMode(OfflinePlayMode? mode) async {
     if (mode == null || mode == _playMode || _saving) return;
     setState(() => _saving = true);
     try {
-      await widget.onModeChanged(mode);
-      if (mounted) setState(() => _playMode = mode);
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('播放模式保存失败，请重新打开列表检查')));
+      while (mounted) {
+        try {
+          await widget.onModeChanged(mode);
+          if (mounted) setState(() => _playMode = mode);
+          break;
+        } catch (_) {
+          if (!await _offerSaveRetry('播放模式保存失败，请重新打开列表检查')) break;
+        }
       }
     } finally {
       if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<bool> _offerSaveRetry(String message) async {
+    if (!mounted) return false;
+    setState(() => _awaitingRetry = true);
+    try {
+      return await showDialog<bool>(
+                context: context,
+                barrierDismissible: false,
+                builder: (context) => AlertDialog(
+                  title: Text(message),
+                  content: const Text('本次修改尚未保存，旧列表仍保留。可重试本次修改，或取消。'
+                      '若空间不足或存储权限异常，请先处理后再试。'),
+                  actions: [
+                    TextButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        child: const Text('取消')),
+                    FilledButton(
+                        onPressed: () => Navigator.pop(context, true),
+                        child: const Text('重试')),
+                  ],
+                ),
+              ) ==
+              true &&
+          mounted;
+    } finally {
+      if (mounted) setState(() => _awaitingRetry = false);
     }
   }
 
@@ -136,17 +167,19 @@ class _OfflinePlaylistEditorSheetState
     final current = _items.isEmpty ? null : _items[_startIndex].cacheKey;
     setState(() => _saving = true);
     try {
-      await widget.onSave(List.of(next));
-      if (!mounted) return;
-      _items
-        ..clear()
-        ..addAll(next);
-      final index = _items.indexWhere((item) => item.cacheKey == current);
-      _startIndex = index < 0 ? 0 : index;
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('自动保存失败，请重新打开列表检查')));
+      while (mounted) {
+        try {
+          await widget.onSave(List.of(next));
+          if (!mounted) return;
+          _items
+            ..clear()
+            ..addAll(next);
+          final index = _items.indexWhere((item) => item.cacheKey == current);
+          _startIndex = index < 0 ? 0 : index;
+          break;
+        } catch (_) {
+          if (!await _offerSaveRetry('自动保存失败，请重新打开列表检查')) break;
+        }
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -194,7 +227,8 @@ class _OfflinePlaylistEditorSheetState
                       ),
                     ),
                     const Divider(height: 1),
-                    if (_saving) const LinearProgressIndicator(),
+                    if (_saving && !_awaitingRetry)
+                      const LinearProgressIndicator(),
                     Wrap(children: [
                       TextButton(
                           onPressed: () => _manageItems('add'),
